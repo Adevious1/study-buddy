@@ -24,7 +24,7 @@ export function StyleBadge({
         <div className="h-[5px] bg-line rounded-full mt-1 overflow-hidden">
           <div
             className="h-full rounded-full"
-            style={{ width: `${score}%`, background: color }}
+            style={{ width: `${Math.min(100, Math.max(0, score))}%`, background: color }}
           />
         </div>
       </div>
