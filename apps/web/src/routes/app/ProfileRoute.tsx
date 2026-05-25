@@ -109,7 +109,8 @@ export function ProfileRoute() {
     return <div className="min-h-full bg-bg" />;
   }
 
-  const accent = pipColorValue;
+  // Brand accent stays fixed (coral) per the spec; only Pip follows pipColorValue.
+  const accent = 'var(--color-coral)';
 
   return (
     <div className="flex flex-1 flex-col overflow-auto bg-bg sb-scroll">

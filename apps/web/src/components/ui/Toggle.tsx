@@ -11,14 +11,13 @@ export function Toggle({ on, accent = 'var(--color-coral)', onChange }: TogglePr
       role="switch"
       aria-checked={on}
       onClick={() => onChange?.(!on)}
-      className="relative shrink-0 border-0 p-0 cursor-pointer"
+      className="relative shrink-0 border-0 p-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
       style={{
         width: 42,
         height: 24,
         borderRadius: 99,
         background: on ? accent : 'var(--color-line)',
         transition: 'background .2s',
-        outline: 'none',
       }}
     >
       <span
