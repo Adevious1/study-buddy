@@ -1,0 +1,108 @@
+/* ─────────────────────────────────────────────────────────────
+   Study Buddy — design tokens
+   Warm cream backdrop, coral primary, mint + lavender accents
+   ───────────────────────────────────────────────────────────── */
+:root {
+  /* surfaces */
+  --bg:      #FFF4E8;     /* warm cream */
+  --bg-2:    #FBE6D0;     /* peach tint */
+  --surface: #FFFFFF;
+  --surface-2:#FFF9F1;
+  --line:    #F0DFC9;
+
+  /* ink */
+  --ink:     #2A1F18;     /* warm near-black */
+  --ink-2:   #5B4A3D;
+  --ink-3:   #8B7A6B;
+  --ink-4:   #B8A89A;
+
+  /* brand */
+  --coral:   #FF7B5A;     /* primary — Pip default */
+  --coral-d: #E5614A;
+  --coral-l: #FFD9CC;
+
+  --mint:    #4FCFA1;
+  --mint-l:  #C9F2DF;
+
+  --lavender:#9D87E8;
+  --lavender-l:#E0D7F7;
+
+  --sun:     #FFCB47;     /* stars/streak */
+  --sun-l:   #FFE9AC;
+
+  /* type */
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body:    'Nunito', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 24px;
+  --r-xl: 32px;
+  --r-pill: 999px;
+}
+
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: #EEE9E3;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+/* shared scrollbar muting inside device frames */
+.sb-scroll::-webkit-scrollbar { width: 0; height: 0; }
+.sb-scroll { scrollbar-width: none; }
+
+/* mascot blob breathing */
+@keyframes pip-breathe {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1.035) translateY(-2px); }
+}
+@keyframes pip-listen {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+@keyframes pip-speak {
+  0%   { transform: scale(1) rotate(-1deg); }
+  25%  { transform: scale(1.04) rotate(1.5deg); }
+  50%  { transform: scale(0.99) rotate(-1deg); }
+  75%  { transform: scale(1.03) rotate(1deg); }
+  100% { transform: scale(1) rotate(-1deg); }
+}
+@keyframes pip-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(0.1); }
+}
+@keyframes ring-pulse {
+  0%   { transform: scale(0.7); opacity: 0.55; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%      { transform: scaleY(1); }
+}
+@keyframes float-up {
+  0%   { transform: translateY(0); opacity: 0.9; }
+  100% { transform: translateY(-30px); opacity: 0; }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* placeholder striped fill for photo slots */
+.sb-photo-ph {
+  background:
+    repeating-linear-gradient(135deg,
+      rgba(0,0,0,0.04) 0 8px,
+      transparent 8px 16px),
+    var(--surface-2);
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+  font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+}
