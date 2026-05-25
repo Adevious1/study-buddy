@@ -66,13 +66,18 @@ export interface WeekActivity {
   todayIndex: number;
 }
 
+export interface RecapItem {
+  ok: boolean;             // true = figured out, false = try again tomorrow
+  text: string;
+}
+
 export interface RecapResult {
   minutes: number;
   starsEarned: number;
   starsMax: number;
   solvedSelf: number;
   solvedTotal: number;
-  figuredOut: { ok: boolean; text: string }[];
+  figuredOut: RecapItem[];
   insightTitle: string;    // "You're a picture person!"
   insightBody: string;
   insightBadge: string;    // "VISUAL +1"

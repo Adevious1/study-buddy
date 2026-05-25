@@ -34,6 +34,10 @@
   --color-sun: #FFCB47;
   --color-sun-l: #FFE9AC;
   --color-sky: #5DB7FF;
+  --color-sky-l: #D6ECFF;
+
+  /* canvas behind the phone frame (distinct from the app's --color-bg) */
+  --color-canvas: #EEE9E3;
 
   --font-display: "Bricolage Grotesque", system-ui, sans-serif;
   --font-body: "Nunito", system-ui, sans-serif;
@@ -85,7 +89,7 @@
   body {
     font-family: var(--font-body);
     color: var(--color-ink);
-    background: #EEE9E3;
+    background: var(--color-canvas);
     -webkit-font-smoothing: antialiased;
   }
   /* muted scrollbars inside scrolling panes */
