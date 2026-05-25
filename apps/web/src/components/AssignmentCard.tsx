@@ -1,6 +1,5 @@
 import type { Assignment } from '@study-buddy/shared';
-import { Star } from './ui/icons';
-import { SubjectIcon } from './ui/icons';
+import { Star, SubjectIcon } from './ui/icons';
 import { Card } from './ui/Card';
 
 interface AssignmentCardProps {
