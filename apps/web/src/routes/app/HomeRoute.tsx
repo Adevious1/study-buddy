@@ -45,7 +45,7 @@ export function HomeRoute() {
             background: 'var(--color-surface)',
             borderRadius: 28,
             padding: 16,
-            boxShadow: '0 4px 0 #F0DFC9',
+            boxShadow: '0 4px 0 var(--color-line)',
           }}
         >
           <Pip size={72} state="idle" color={pipColorValue} expression="happy" shadow={false} />

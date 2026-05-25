@@ -102,7 +102,9 @@ export function VoiceRoute() {
   const { pipColorValue } = usePipColor();
 
   const voiceState: 'listen' | 'idle' = active ? 'listen' : 'idle';
-  const accent = pipColorValue;
+  // Brand accent stays fixed (coral) for the mic CTA, rings, dots, and waveform
+  // per the spec; only Pip's body follows the customizable pipColorValue.
+  const accent = 'var(--color-coral)';
 
   return (
     <div
@@ -165,7 +167,7 @@ export function VoiceRoute() {
 
       {/* Pip hero + state chip */}
       <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 pt-2">
-        <Pip size={180} state={voiceState} color={accent} expression="happy" />
+        <Pip size={180} state={voiceState} color={pipColorValue} expression="happy" />
 
         {/* State chip */}
         <div className="inline-flex items-center gap-2 px-[14px] py-2 bg-surface border-[1.5px] border-line rounded-full font-body font-bold text-[13px] text-ink-2 shadow-[0_2px_0_rgba(0,0,0,0.04)]">
