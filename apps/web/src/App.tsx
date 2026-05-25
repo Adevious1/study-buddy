@@ -1,11 +1,30 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { PipColorProvider } from './state/PipColorContext';
+import { AppLayout } from './routes/app/AppLayout';
+import { HomeRoute } from './routes/app/HomeRoute';
+import { LibraryRoute } from './routes/app/LibraryRoute';
+import { ProfileRoute } from './routes/app/ProfileRoute';
+import { VoiceRoute } from './routes/app/VoiceRoute';
+import { RecapRoute } from './routes/app/RecapRoute';
+import { DashboardRoute } from './routes/dashboard/DashboardRoute';
+
 export default function App() {
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center gap-6">
-      <div className="rounded-xl bg-coral px-6 py-4 font-display text-2xl font-extrabold text-white shadow-[0_4px_0_var(--color-coral-d)]">
-        Pip
-      </div>
-      <div className="h-10 w-10 rounded-full bg-mint animate-pip-breathe" />
-      <span className="font-mono text-ink-3">tokens OK</span>
-    </div>
+    <PipColorProvider initial="coral">
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Navigate to="/app" replace />} />
+          <Route path="/app" element={<AppLayout />}>
+            <Route index element={<HomeRoute />} />
+            <Route path="subjects" element={<LibraryRoute />} />
+            <Route path="me" element={<ProfileRoute />} />
+            <Route path="voice" element={<VoiceRoute />} />
+            <Route path="recap" element={<RecapRoute />} />
+          </Route>
+          <Route path="/dashboard" element={<DashboardRoute />} />
+          <Route path="*" element={<Navigate to="/app" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </PipColorProvider>
   );
 }
