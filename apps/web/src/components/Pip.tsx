@@ -100,16 +100,16 @@ export function Pip({
 
       {state === 'listen' && (
         <>
-          <Ring size={size} delay={0} color={color} />
-          <Ring size={size} delay={0.7} color={color} />
-          <Ring size={size} delay={1.4} color={color} />
+          <Ring delay={0} color={color} />
+          <Ring delay={0.7} color={color} />
+          <Ring delay={1.4} color={color} />
         </>
       )}
     </div>
   );
 }
 
-function Ring({ size: _size, delay, color }: { size: number; delay: number; color: string }) {
+function Ring({ delay, color }: { delay: number; color: string }) {
   return (
     <div
       className="pointer-events-none absolute inset-0 rounded-full animate-ring-pulse"
