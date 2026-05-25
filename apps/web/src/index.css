@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* self-hosted fonts (weights used by the design) */
+@import "@fontsource/bricolage-grotesque/500.css";
+@import "@fontsource/bricolage-grotesque/600.css";
+@import "@fontsource/bricolage-grotesque/700.css";
+@import "@fontsource/bricolage-grotesque/800.css";
+@import "@fontsource/nunito/500.css";
+@import "@fontsource/nunito/600.css";
+@import "@fontsource/nunito/700.css";
+@import "@fontsource/nunito/800.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
+@theme {
+  --color-bg: #FFF4E8;
+  --color-bg-2: #FBE6D0;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #FFF9F1;
+  --color-line: #F0DFC9;
+
+  --color-ink: #2A1F18;
+  --color-ink-2: #5B4A3D;
+  --color-ink-3: #8B7A6B;
+  --color-ink-4: #B8A89A;
+
+  --color-coral: #FF7B5A;
+  --color-coral-d: #E5614A;
+  --color-coral-l: #FFD9CC;
+  --color-mint: #4FCFA1;
+  --color-mint-l: #C9F2DF;
+  --color-lavender: #9D87E8;
+  --color-lavender-l: #E0D7F7;
+  --color-sun: #FFCB47;
+  --color-sun-l: #FFE9AC;
+  --color-sky: #5DB7FF;
+
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: "Nunito", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  --animate-pip-breathe: pip-breathe 3.6s ease-in-out infinite;
+  --animate-pip-listen: pip-listen 1.1s ease-in-out infinite;
+  --animate-pip-speak: pip-speak 0.45s ease-in-out infinite;
+  --animate-pip-blink: pip-blink 4.8s ease-in-out infinite;
+  --animate-ring-pulse: ring-pulse 2.2s ease-out infinite;
+  --animate-wave-bar: wave-bar 0.7s ease-in-out infinite;
+}
+
+@keyframes pip-breathe {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1.035) translateY(-2px); }
+}
+@keyframes pip-listen {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+@keyframes pip-speak {
+  0%   { transform: scale(1) rotate(-1deg); }
+  25%  { transform: scale(1.04) rotate(1.5deg); }
+  50%  { transform: scale(0.99) rotate(-1deg); }
+  75%  { transform: scale(1.03) rotate(1deg); }
+  100% { transform: scale(1) rotate(-1deg); }
+}
+@keyframes pip-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(0.1); }
+}
+@keyframes ring-pulse {
+  0%   { transform: scale(0.7); opacity: 0.55; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%      { transform: scaleY(1); }
+}
+
+@layer base {
+  html, body, #root { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    background: #EEE9E3;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* muted scrollbars inside scrolling panes */
+  .sb-scroll::-webkit-scrollbar { width: 0; height: 0; }
+  .sb-scroll { scrollbar-width: none; }
+}
