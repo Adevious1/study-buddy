@@ -7,24 +7,7 @@ import { Flame, Sparkle, SubjectIcon } from '../../components/ui/icons';
 import { repository } from '../../data';
 import { useResource } from '../../hooks/useResource';
 import { usePipColor } from '../../state/PipColorContext';
-import type { SubjectKind } from '@study-buddy/shared';
-
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
-
-interface AdventureCard {
-  subject: string;
-  title: string;
-  mins: number;
-  color: string;
-  soft: string;
-  kind: SubjectKind;
-}
-
-const ADVENTURES: AdventureCard[] = [
-  { subject: 'Math',    title: 'Word problems',          mins: 15, color: 'var(--color-lavender)', soft: 'var(--color-lavender-l)', kind: 'math' },
-  { subject: 'Reading', title: "Charlotte's Web, Ch. 3", mins: 10, color: 'var(--color-mint)',     soft: 'var(--color-mint-l)',     kind: 'reading' },
-  { subject: 'Spelling',title: '-tion words',            mins: 5,  color: 'var(--color-sun)',      soft: 'var(--color-sun-l)',      kind: 'writing' },
-];
 
 export function DashboardRoute() {
   const navigate = useNavigate();
@@ -33,10 +16,9 @@ export function DashboardRoute() {
   const student        = useResource(() => repository.getStudent());
   const continueSession = useResource(() => repository.getContinueSession());
   const weekActivity   = useResource(() => repository.getWeekActivity());
-  const learningProfile = useResource(() => repository.getLearningProfile());
   const assignments    = useResource(() => repository.getTodayAssignments());
 
-  if (!student || !continueSession || !weekActivity || !learningProfile || !assignments) {
+  if (!student || !continueSession || !weekActivity || !assignments) {
     return <div className="min-h-screen w-full bg-bg" />;
   }
 
@@ -275,9 +257,7 @@ export function DashboardRoute() {
                 className="font-display font-bold text-ink"
                 style={{ fontSize: 16, marginTop: 6, lineHeight: 1.25 }}
               >
-                {learningProfile.note.length > 80
-                  ? 'You learn best when we draw it out first.'
-                  : learningProfile.note}
+                You learn best when we draw it out first.
               </div>
             </Card>
           </div>
@@ -295,9 +275,9 @@ export function DashboardRoute() {
             gap: 12,
           }}
         >
-          {ADVENTURES.map((c) => (
+          {assignments.map((a) => (
             <Card
-              key={c.subject}
+              key={a.id}
               className="border-[1.5px] border-line flex flex-col"
               style={{ borderRadius: 22, padding: 18, gap: 14 }}
             >
@@ -305,9 +285,9 @@ export function DashboardRoute() {
               <div className="flex justify-between items-start">
                 <div
                   className="flex items-center justify-center rounded-[14px]"
-                  style={{ width: 48, height: 48, background: c.color }}
+                  style={{ width: 48, height: 48, background: `var(--color-${a.color})` }}
                 >
-                  <SubjectIcon kind={c.kind} size={26} />
+                  <SubjectIcon kind={a.iconKind} size={26} />
                 </div>
                 <div
                   className="font-mono font-bold uppercase tracking-[0.4px]"
@@ -315,24 +295,24 @@ export function DashboardRoute() {
                     fontSize: 10,
                     padding: '4px 10px',
                     borderRadius: 99,
-                    background: c.soft,
-                    color: c.color,
+                    background: `var(--color-${a.softColor})`,
+                    color: `var(--color-${a.color})`,
                   }}
                 >
-                  {c.mins} min
+                  {a.minutes} min
                 </div>
               </div>
 
               {/* Subject label + title */}
               <div>
                 <div className="font-bold text-[11px] text-ink-3 uppercase tracking-[0.5px]">
-                  {c.subject}
+                  {a.subject}
                 </div>
                 <div
                   className="font-display font-bold text-ink"
                   style={{ fontSize: 17, marginTop: 2 }}
                 >
-                  {c.title}
+                  {a.title}
                 </div>
               </div>
 
