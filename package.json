@@ -1,0 +1,12 @@
+{
+  "name": "study-buddy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Study Buddy — a K-5 voice-led tutor anchored on Pip, a friendly mascot.",
+  "scripts": {
+    "dev": "pnpm --filter @study-buddy/web dev",
+    "build": "pnpm --filter @study-buddy/web build",
+    "typecheck": "pnpm -r typecheck",
+    "preview": "pnpm --filter @study-buddy/web preview"
+  }
+}
