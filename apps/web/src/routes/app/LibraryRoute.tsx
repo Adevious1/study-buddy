@@ -63,7 +63,7 @@ export function LibraryRoute() {
               width: 36,
               height: 36,
               borderRadius: 99,
-              background: pipColorValue,
+              background: 'var(--color-coral)',
             }}
           >
             ›
