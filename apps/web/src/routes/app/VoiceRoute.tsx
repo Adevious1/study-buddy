@@ -21,8 +21,9 @@ function ControlBtn({
   onClick?: () => void;
 }) {
   return (
-    <div
-      className="flex flex-col items-center gap-[6px] cursor-pointer"
+    <button
+      type="button"
+      className="flex flex-col items-center gap-[6px] cursor-pointer bg-transparent border-0 p-0"
       onClick={onClick}
     >
       <div
@@ -39,7 +40,7 @@ function ControlBtn({
       >
         {label}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -53,8 +54,10 @@ function BigMic({
   onClick: () => void;
 }) {
   return (
-    <div
-      className="relative cursor-pointer"
+    <button
+      type="button"
+      aria-label="Toggle microphone"
+      className="relative cursor-pointer block bg-transparent border-0 p-0"
       style={{ width: 96, height: 96 }}
       onClick={onClick}
     >
@@ -87,7 +90,7 @@ function BigMic({
           />
         </svg>
       </div>
-    </div>
+    </button>
   );
 }
 
