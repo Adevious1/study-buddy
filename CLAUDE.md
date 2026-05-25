@@ -22,12 +22,15 @@ actually true in the repo.
 | Styling | Tailwind CSS — the design tokens ARE the theme |
 | Routing | react-router; two trees: `/app/*` (phone) and `/dashboard` (desktop) |
 | Fonts | self-hosted via `@fontsource` (Bricolage Grotesque / Nunito / JetBrains Mono) |
+| Backend | **Hono** (TypeScript) — HTTP/API + the WebSocket relay |
 | Voice / AI | **Gemini Live API** (`gemini-3.1-flash-live-preview`), real-time audio |
-| Live API auth | full backend relay: browser ⇄ our WS server ⇄ Gemini (API key stays server-side) |
-| Database | Postgres in Docker, Drizzle ORM |
-| Accounts | guardian account → multiple child profiles |
+| Live API auth | full backend relay: browser ⇄ our Hono WS server ⇄ Gemini (API key stays server-side) |
+| Database | Postgres + Drizzle ORM |
+| Accounts | guardian account (**Google sign-in**) → multiple child profiles |
+| Auth method | **Google OAuth** for the guardian (likely via `better-auth`'s Google provider — confirm in SP4) |
 | Billing | per-child-profile (seat-based) subscription |
 | Repo | pnpm monorepo |
+| Deployment | **everything in Docker** — `docker-compose` runs web + Hono server + Postgres |
 
 ## Subsystem roadmap
 
@@ -50,11 +53,17 @@ implementation cycle. **Do not collapse these into one effort.**
 
 ```
 apps/web/            React + Vite + TS + Tailwind (the client)
-apps/server/         (SP2) TS relay/API server
+apps/server/         (SP2) Hono server — HTTP/API + Gemini Live WebSocket relay
 packages/shared/     domain types + contracts shared by client and server
-docker-compose.yml   (SP2) Postgres
+docker-compose.yml   (SP2) full stack: web + Hono server + Postgres
+Dockerfile(s)        (SP2) per-app images (apps/web, apps/server)
 docs/superpowers/specs/   design specs
 ```
+
+> **Hono WS note (SP2/SP3):** the Gemini Live relay is a WebSocket bridge, so the
+> server runtime + WS adapter (`@hono/node-ws` on Node, native on Bun) is a real
+> design decision for the SP2 brainstorm — Hono covers the HTTP/API + token surface
+> cleanly either way.
 
 ## Conventions
 
