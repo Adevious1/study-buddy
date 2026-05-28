@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Pip } from '../../components/Pip';
 import { Card } from '../../components/ui/Card';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { StyleBadge } from '../../components/ui/StyleBadge';
 import { Toggle } from '../../components/ui/Toggle';
 import { Flame } from '../../components/ui/icons';
-import { repository } from '../../data';
-import { useResource } from '../../hooks/useResource';
+import { ErrorState } from '../../components/atoms/ErrorState';
+import { repository, CURRENT_CHILD_ID } from '../../data';
+import { formatStudentSubtitle } from '../../format';
+import { traitColor } from '../../theme/subjectTheme';
 import { usePipColor, PIP_COLOR_VALUE } from '../../state/PipColorContext';
 import type { PipColor } from '@study-buddy/shared';
 
@@ -14,7 +17,7 @@ const PIP_COLORS = Object.keys(PIP_COLOR_VALUE) as PipColor[];
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-// trait.color is a token name like 'lavender'; resolve to CSS var
+// trait color token → CSS var
 function traitColorVar(token: string): string {
   return `var(--color-${token})`;
 }
@@ -101,13 +104,38 @@ function ToggleRow({ label, sub, initial, accent, last }: {
 export function ProfileRoute() {
   const { pipColor, pipColorValue, setPipColor } = usePipColor();
 
-  const student = useResource(() => repository.getStudent());
-  const profile = useResource(() => repository.getLearningProfile());
-  const week = useResource(() => repository.getWeekActivity());
+  const studentQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'student'],
+    queryFn: () => repository.getStudent(),
+  });
+  const profileQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'learningProfile'],
+    queryFn: () => repository.getLearningProfile(),
+  });
+  const weekQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'weekActivity'],
+    queryFn: () => repository.getWeekActivity(),
+  });
 
-  if (!student || !profile || !week) {
+  if (studentQ.isError || profileQ.isError || weekQ.isError) {
+    return (
+      <ErrorState
+        onRetry={() => {
+          studentQ.refetch();
+          profileQ.refetch();
+          weekQ.refetch();
+        }}
+      />
+    );
+  }
+
+  if (!studentQ.data || !profileQ.data || !weekQ.data) {
     return <div className="min-h-full bg-bg" />;
   }
+
+  const student = studentQ.data;
+  const profile = profileQ.data;
+  const week = weekQ.data;
 
   // Brand accent stays fixed (coral) per the spec; only Pip follows pipColorValue.
   const accent = 'var(--color-coral)';
@@ -118,7 +146,7 @@ export function ProfileRoute() {
       {/* Header */}
       <div style={{ padding: '14px 20px 6px' }}>
         <div className="font-display font-extrabold text-[26px] text-ink">{student.name}</div>
-        <div className="font-body font-semibold text-[13px] text-ink-3">{student.ageLabel}</div>
+        <div className="font-body font-semibold text-[13px] text-ink-3">{formatStudentSubtitle(student)}</div>
       </div>
 
       {/* Customize Pip */}
@@ -180,11 +208,11 @@ export function ProfileRoute() {
         <div className="flex flex-col gap-2">
           {profile.traits.map((trait) => (
             <StyleBadge
-              key={trait.id}
+              key={trait.traitId}
               label={trait.label}
               score={trait.score}
-              color={traitColorVar(trait.color)}
-              icon={TRAIT_ICONS[trait.id] ?? null}
+              color={traitColorVar(traitColor(trait.traitId))}
+              icon={TRAIT_ICONS[trait.traitId] ?? null}
             />
           ))}
         </div>

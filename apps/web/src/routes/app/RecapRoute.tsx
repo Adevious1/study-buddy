@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Pip } from '../../components/Pip';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Star, Sparkle } from '../../components/ui/icons';
-import { repository } from '../../data';
-import { useResource } from '../../hooks/useResource';
+import { ErrorState } from '../../components/atoms/ErrorState';
+import { repository, CURRENT_CHILD_ID } from '../../data';
+import { formatMinutes } from '../../format';
 import { usePipColor } from '../../state/PipColorContext';
 
 // Inline confetti dot positions / colors from the reference
@@ -22,13 +24,32 @@ export function RecapRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
 
-  const recap = useResource(() => repository.getRecap());
-  const student = useResource(() => repository.getStudent());
+  const recapQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'recap'],
+    queryFn: () => repository.getRecap(),
+  });
+  const studentQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'student'],
+    queryFn: () => repository.getStudent(),
+  });
 
-  // Guard: render placeholder until both resolve
-  if (!recap || !student) {
+  if (recapQ.isError || studentQ.isError) {
+    return (
+      <ErrorState
+        onRetry={() => {
+          recapQ.refetch();
+          studentQ.refetch();
+        }}
+      />
+    );
+  }
+
+  if (!recapQ.data || !studentQ.data) {
     return <div className="flex-1 bg-bg" />;
   }
+
+  const recap = recapQ.data;
+  const student = studentQ.data;
 
   return (
     <div className="flex flex-1 flex-col bg-bg overflow-auto sb-scroll">
@@ -63,7 +84,7 @@ export function RecapRoute() {
         </div>
 
         <div className="mt-1.5 font-body font-semibold text-[14px] text-ink-2">
-          You and Pip just spent <b>{recap.minutes} minutes</b> on word problems.
+          You and Pip just spent <b>{formatMinutes(recap.durationSeconds)} minutes</b> on word problems.
         </div>
       </div>
 

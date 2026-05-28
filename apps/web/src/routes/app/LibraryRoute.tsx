@@ -1,20 +1,31 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Pip } from '../../components/Pip';
 import { Card } from '../../components/ui/Card';
 import { SubjectIcon } from '../../components/ui/icons';
-import { repository } from '../../data';
-import { useResource } from '../../hooks/useResource';
+import { ErrorState } from '../../components/atoms/ErrorState';
+import { repository, CURRENT_CHILD_ID } from '../../data';
+import { subjectLabel, subjectTheme } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
 
 export function LibraryRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
 
-  const subjects = useResource(() => repository.getSubjects());
+  const subjectsQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'subjects'],
+    queryFn: () => repository.getSubjects(),
+  });
 
-  if (!subjects) {
+  if (subjectsQ.isError) {
+    return <ErrorState onRetry={() => subjectsQ.refetch()} />;
+  }
+
+  if (!subjectsQ.data) {
     return <div className="min-h-full bg-bg" />;
   }
+
+  const subjects = subjectsQ.data;
 
   return (
     <div className="flex flex-1 flex-col overflow-auto bg-bg sb-scroll">
@@ -80,42 +91,45 @@ export function LibraryRoute() {
           gap: 10,
         }}
       >
-        {subjects.map((s) => (
-          <Card
-            key={s.kind}
-            className="flex cursor-pointer flex-col gap-[10px]"
-            style={{
-              background: s.soft,
-              borderRadius: 22,
-              padding: 14,
-              minHeight: 130,
-            }}
-            onClick={() => navigate('/app/voice')}
-          >
-            <div
-              className="flex items-center justify-center"
+        {subjects.map((s) => {
+          const theme = subjectTheme(s.kind);
+          return (
+            <Card
+              key={s.kind}
+              className="flex cursor-pointer flex-col gap-[10px]"
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 14,
-                background: s.color,
+                background: theme.soft,
+                borderRadius: 22,
+                padding: 14,
+                minHeight: 130,
               }}
+              onClick={() => navigate('/app/voice')}
             >
-              <SubjectIcon kind={s.kind} size={24} />
-            </div>
-            <div className="flex-1">
-              <div className="font-display text-[15px] font-bold text-ink">
-                {s.label}
-              </div>
               <div
-                className="font-body font-semibold text-ink-3"
-                style={{ fontSize: 11.5, marginTop: 2 }}
+                className="flex items-center justify-center"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  background: theme.color,
+                }}
               >
-                {s.topic}
+                <SubjectIcon kind={s.kind} size={24} />
               </div>
-            </div>
-          </Card>
-        ))}
+              <div className="flex-1">
+                <div className="font-display text-[15px] font-bold text-ink">
+                  {subjectLabel(s.kind)}
+                </div>
+                <div
+                  className="font-body font-semibold text-ink-3"
+                  style={{ fontSize: 11.5, marginTop: 2 }}
+                >
+                  {s.topic}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

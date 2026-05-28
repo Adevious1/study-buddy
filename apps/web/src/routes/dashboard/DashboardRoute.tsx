@@ -1,29 +1,64 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Pip } from '../../components/Pip';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Flame, Sparkle, SubjectIcon } from '../../components/ui/icons';
-import { repository } from '../../data';
-import { useResource } from '../../hooks/useResource';
+import { ErrorState } from '../../components/atoms/ErrorState';
+import { repository, CURRENT_CHILD_ID } from '../../data';
+import { formatDuration, formatDelta, formatStudentSubtitle } from '../../format';
+import { subjectLabel, subjectTheme } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
+
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 export function DashboardRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
 
-  const student        = useResource(() => repository.getStudent());
-  const continueSession = useResource(() => repository.getContinueSession());
-  const weekActivity   = useResource(() => repository.getWeekActivity());
-  const assignments    = useResource(() => repository.getTodayAssignments());
+  const studentQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'student'],
+    queryFn: () => repository.getStudent(),
+  });
+  const continueQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'continueSession'],
+    queryFn: () => repository.getContinueSession(),
+  });
+  const weekActivityQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'weekActivity'],
+    queryFn: () => repository.getWeekActivity(),
+  });
+  const assignmentsQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'assignments'],
+    queryFn: () => repository.getTodayAssignments(),
+  });
 
-  if (!student || !continueSession || !weekActivity || !assignments) {
+  if (studentQ.isError || continueQ.isError || weekActivityQ.isError || assignmentsQ.isError) {
+    return (
+      <ErrorState
+        onRetry={() => {
+          studentQ.refetch();
+          continueQ.refetch();
+          weekActivityQ.refetch();
+          assignmentsQ.refetch();
+        }}
+      />
+    );
+  }
+
+  if (!studentQ.data || !continueQ.data || !weekActivityQ.data || !assignmentsQ.data) {
     return <div className="min-h-screen w-full bg-bg" />;
   }
 
+  const student = studentQ.data;
+  const continueSession = continueQ.data;
+  const weekActivity = weekActivityQ.data;
+  const assignments = assignmentsQ.data;
+
   const nameInitial = student.name.charAt(0).toUpperCase();
-  const gradeLabel = student.ageLabel.split('·')[1]?.trim() ?? 'Grade 3';
+  const subtitle = formatStudentSubtitle(student);
+  const gradeLabel = subtitle.split('·')[1]?.trim() ?? 'Grade 3';
 
   return (
     <div className="min-h-screen w-full flex bg-bg font-body">
@@ -209,10 +244,10 @@ export function DashboardRoute() {
               </div>
               <div className="flex items-baseline" style={{ gap: 6, marginTop: 6 }}>
                 <span className="font-display font-extrabold text-ink" style={{ fontSize: 36 }}>
-                  {weekActivity.totalLabel}
+                  {formatDuration(weekActivity.totalSeconds)}
                 </span>
                 <span className="font-bold text-[12px] text-mint">
-                  {weekActivity.deltaLabel}
+                  {formatDelta(weekActivity.deltaSeconds)}
                 </span>
               </div>
 
@@ -275,53 +310,56 @@ export function DashboardRoute() {
             gap: 12,
           }}
         >
-          {assignments.map((a) => (
-            <Card
-              key={a.id}
-              className="border-[1.5px] border-line flex flex-col"
-              style={{ borderRadius: 22, padding: 18, gap: 14 }}
-            >
-              {/* Icon tile + mins badge */}
-              <div className="flex justify-between items-start">
-                <div
-                  className="flex items-center justify-center rounded-[14px]"
-                  style={{ width: 48, height: 48, background: `var(--color-${a.color})` }}
-                >
-                  <SubjectIcon kind={a.iconKind} size={26} />
+          {assignments.map((a) => {
+            const theme = subjectTheme(a.subjectKind);
+            return (
+              <Card
+                key={a.id}
+                className="border-[1.5px] border-line flex flex-col"
+                style={{ borderRadius: 22, padding: 18, gap: 14 }}
+              >
+                {/* Icon tile + mins badge */}
+                <div className="flex justify-between items-start">
+                  <div
+                    className="flex items-center justify-center rounded-[14px]"
+                    style={{ width: 48, height: 48, background: `var(--color-${theme.token})` }}
+                  >
+                    <SubjectIcon kind={a.subjectKind} size={26} />
+                  </div>
+                  <div
+                    className="font-mono font-bold uppercase tracking-[0.4px]"
+                    style={{
+                      fontSize: 10,
+                      padding: '4px 10px',
+                      borderRadius: 99,
+                      background: `var(--color-${theme.softToken})`,
+                      color: `var(--color-${theme.token})`,
+                    }}
+                  >
+                    {a.minutes} min
+                  </div>
                 </div>
-                <div
-                  className="font-mono font-bold uppercase tracking-[0.4px]"
-                  style={{
-                    fontSize: 10,
-                    padding: '4px 10px',
-                    borderRadius: 99,
-                    background: `var(--color-${a.softColor})`,
-                    color: `var(--color-${a.color})`,
-                  }}
-                >
-                  {a.minutes} min
-                </div>
-              </div>
 
-              {/* Subject label + title */}
-              <div>
-                <div className="font-bold text-[11px] text-ink-3 uppercase tracking-[0.5px]">
-                  {a.subject}
+                {/* Subject label + title */}
+                <div>
+                  <div className="font-bold text-[11px] text-ink-3 uppercase tracking-[0.5px]">
+                    {subjectLabel(a.subjectKind)}
+                  </div>
+                  <div
+                    className="font-display font-bold text-ink"
+                    style={{ fontSize: 17, marginTop: 2 }}
+                  >
+                    {a.title}
+                  </div>
                 </div>
-                <div
-                  className="font-display font-bold text-ink"
-                  style={{ fontSize: 17, marginTop: 2 }}
-                >
-                  {a.title}
-                </div>
-              </div>
 
-              {/* CTA */}
-              <Button kind="soft" size="sm" full onClick={() => navigate('/app/voice')}>
-                Start →
-              </Button>
-            </Card>
-          ))}
+                {/* CTA */}
+                <Button kind="soft" size="sm" full onClick={() => navigate('/app/voice')}>
+                  Start →
+                </Button>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Open app link — bottom of main */}

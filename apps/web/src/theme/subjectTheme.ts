@@ -1,4 +1,4 @@
-import type { SubjectKind } from '@study-buddy/shared';
+import type { SubjectKind, LearningTraitId } from '@study-buddy/shared';
 
 export interface SubjectTheme {
   label: string;
@@ -26,4 +26,15 @@ export function subjectTheme(kind: SubjectKind): SubjectTheme {
 
 export function subjectLabel(kind: SubjectKind): string {
   return themes[kind].label;
+}
+
+const traitColors: Record<LearningTraitId, string> = {
+  visual:       'lavender',
+  narrative:    'mint',
+  kinesthetic:  'coral',
+  auditory:     'sun',
+};
+
+export function traitColor(traitId: LearningTraitId): string {
+  return traitColors[traitId];
 }

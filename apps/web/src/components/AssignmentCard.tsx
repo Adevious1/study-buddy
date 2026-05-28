@@ -1,6 +1,7 @@
 import type { Assignment } from '@study-buddy/shared';
 import { Star, SubjectIcon } from './ui/icons';
 import { Card } from './ui/Card';
+import { subjectLabel, subjectTheme } from '../theme/subjectTheme';
 
 interface AssignmentCardProps {
   assignment: Assignment;
@@ -8,7 +9,8 @@ interface AssignmentCardProps {
 }
 
 export function AssignmentCard({ assignment, last = false }: AssignmentCardProps) {
-  const { subject, title, minutes, stars, totalStars, color, softColor, iconKind } = assignment;
+  const { subjectKind, title, minutes, stars, totalStars } = assignment;
+  const theme = subjectTheme(subjectKind);
 
   return (
     <Card
@@ -26,15 +28,15 @@ export function AssignmentCard({ assignment, last = false }: AssignmentCardProps
           width: 52,
           height: 52,
           borderRadius: 16,
-          background: `var(--color-${color})`,
+          background: `var(--color-${theme.token})`,
         }}
       >
-        <SubjectIcon kind={iconKind} size={26} />
+        <SubjectIcon kind={subjectKind} size={26} />
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="font-body text-[11px] font-bold uppercase tracking-[0.4px] text-ink-3">
-          {subject} · {minutes} min
+          {subjectLabel(subjectKind)} · {minutes} min
         </div>
         <div className="mt-[1px] font-display text-[16px] font-bold text-ink">
           {title}
@@ -52,8 +54,8 @@ export function AssignmentCard({ assignment, last = false }: AssignmentCardProps
           width: 36,
           height: 36,
           borderRadius: 99,
-          background: `var(--color-${softColor})`,
-          color: `var(--color-${color})`,
+          background: `var(--color-${theme.softToken})`,
+          color: `var(--color-${theme.token})`,
         }}
       >
         ›

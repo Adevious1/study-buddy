@@ -1,25 +1,52 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Pip } from '../../components/Pip';
 import { AssignmentCard } from '../../components/AssignmentCard';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Flame, Star } from '../../components/ui/icons';
-import { repository } from '../../data';
-import { useResource } from '../../hooks/useResource';
+import { ErrorState } from '../../components/atoms/ErrorState';
+import { repository, CURRENT_CHILD_ID } from '../../data';
+import { formatProgressLabel } from '../../format';
 import { usePipColor } from '../../state/PipColorContext';
 
 export function HomeRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
 
-  const student = useResource(() => repository.getStudent());
-  const continueSession = useResource(() => repository.getContinueSession());
-  const assignments = useResource(() => repository.getTodayAssignments());
+  const studentQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'student'],
+    queryFn: () => repository.getStudent(),
+  });
+  const continueQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'continueSession'],
+    queryFn: () => repository.getContinueSession(),
+  });
+  const assignmentsQ = useQuery({
+    queryKey: ['child', CURRENT_CHILD_ID, 'assignments'],
+    queryFn: () => repository.getTodayAssignments(),
+  });
 
-  if (!student || !continueSession || !assignments) {
+  if (studentQ.isError || continueQ.isError || assignmentsQ.isError) {
+    return (
+      <ErrorState
+        onRetry={() => {
+          studentQ.refetch();
+          continueQ.refetch();
+          assignmentsQ.refetch();
+        }}
+      />
+    );
+  }
+
+  if (!studentQ.data || !continueQ.data || !assignmentsQ.data) {
     return <div className="min-h-full bg-bg" />;
   }
+
+  const student = studentQ.data;
+  const continueSession = continueQ.data;
+  const assignments = assignmentsQ.data;
 
   return (
     <div className="flex flex-1 flex-col overflow-auto bg-bg sb-scroll">
@@ -135,7 +162,7 @@ export function HomeRoute() {
             className="font-body text-[13px] font-semibold"
             style={{ color: 'rgba(255,255,255,0.7)', marginTop: 6 }}
           >
-            {continueSession.progressLabel}
+            {formatProgressLabel(continueSession)}
           </div>
 
           <div style={{ marginTop: 14 }}>
