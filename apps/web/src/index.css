@@ -35,6 +35,10 @@
   --color-sun-l: #FFE9AC;
   --color-sky: #5DB7FF;
   --color-sky-l: #D6ECFF;
+  --color-spanish-c: #5DB7FF;
+  --color-spanish-c-l: #D6ECFF;
+  --color-social-c: #E07AB3;
+  --color-social-c-l: #FAD5EA;
 
   /* canvas behind the phone frame (distinct from the app's --color-bg) */
   --color-canvas: #EEE9E3;

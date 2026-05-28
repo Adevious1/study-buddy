@@ -1,6 +1,6 @@
-# Study Buddy — Web App (UI Foundation)
+# Study Buddy — Web App
 
-Study Buddy is a K-5 voice-led tutoring interface anchored on Pip, a friendly mascot that guides kids through homework sessions. This package is the **UI foundation sub-project**: a fully navigable React app running on mock data, with all route trees, components, design tokens, and data seams in place for the real backend to be wired in later.
+Study Buddy is a K-5 voice-led tutoring interface anchored on Pip, a friendly mascot that guides kids through homework sessions. This workspace is the React client — fully navigable, all route trees, design tokens, and data layer in place.
 
 ---
 
@@ -12,13 +12,17 @@ Install dependencies from the repo root (pnpm workspaces):
 pnpm install
 ```
 
-Start the dev server:
+Run the full dev stack (web + server + Postgres) from the repo root:
 
 ```bash
-pnpm --filter @study-buddy/web dev
+pnpm dev           # docker compose up — opens at http://localhost:5173
 ```
 
-The app opens at `http://localhost:5173`.
+To run just the Vite dev server against an already-running backend:
+
+```bash
+pnpm dev:web       # alias: pnpm --filter @study-buddy/web dev
+```
 
 ---
 
@@ -37,45 +41,47 @@ The app hosts two separate experiences under one Vite entry point:
 | `/` | — | Redirects to `/app` |
 | `*` | — | Redirects to `/app` |
 
-`AppLayout` hides the bottom nav and the "Open dashboard" link on `/app/voice` and `/app/recap` (the immersive screens).
+`AppLayout` hides the bottom nav on `/app/voice` and `/app/recap` (the immersive screens).
 
 ---
 
-## Data seam (`src/data`)
+## Data layer (`src/data`)
 
-All screens read data through an async `Repository` interface defined in `src/data/repository.ts`. The current implementation (`src/data/mockRepository.ts`) resolves instantly from static fixtures in `src/data/fixtures.ts`.
+All screens read data through an async `Repository` interface defined in `src/data/repository.ts`. This interface is the stable seam — it was not changed in SP2 and will not change as the backend evolves.
 
-To swap in a real API, replace the single export in `src/data/index.ts`:
+**SP2 implementation:** `src/data/apiRepository.ts` — fetches over HTTP from the Hono backend. The active export in `src/data/index.ts`:
 
 ```ts
-// src/data/index.ts  (today)
-export const repository: Repository = mockRepository;
-
-// SP2: replace with
-export const repository: Repository = new ApiRepository(/* config */);
+export const repository: Repository = apiRepository;
 ```
 
-Screen code imports `repository` from `src/data` only — no screen touches fixtures or mock internals directly.
+SP1's `mockRepository.ts` and `fixtures.ts` have been deleted. Type contracts in `packages/shared` are the authoritative source of truth.
+
+### Data fetching
+
+Screens fetch via [TanStack Query](https://tanstack.com/query) (`@tanstack/react-query`), not the old `useResource` hook (deleted in SP2). Query keys follow the convention:
+
+```ts
+['child', CURRENT_CHILD_ID, '<resource>']
+// e.g. ['child', CURRENT_CHILD_ID, 'student']
+//      ['child', CURRENT_CHILD_ID, 'assignments']
+```
+
+`CURRENT_CHILD_ID` is set via the `VITE_CURRENT_CHILD_ID` env var (provided by Docker or a local `.env`).
 
 ---
 
 ## Pip color (`PipColorContext`)
 
-`src/state/PipColorContext.tsx` exposes a `PipColorProvider` and `usePipColor()` hook. The `pipColorValue` string (a CSS custom property reference) is passed to `<Pip color={pipColorValue}>` only — it recolors Pip's body and the mic/waveform that represent Pip's listening state. Brand chrome (buttons, bottom nav accent, section headings) uses the fixed coral token (`var(--color-coral)`), independent of the chosen Pip color.
-
-The Profile screen lets kids pick Pip's color; the selection persists for the session via React context.
+`src/state/PipColorContext.tsx` exposes a `PipColorProvider` and `usePipColor()` hook. The `pipColorValue` string recolors Pip's body and the mic/waveform representing Pip's listening state. Brand chrome (buttons, bottom nav, CTAs) uses the fixed coral token (`var(--color-coral)`).
 
 ---
 
 ## Deferred subsystems
 
-The following were explicitly out of scope for this UI-foundation sub-project and will be addressed in later sub-projects:
-
-- **Real voice / Gemini Live API** — `VoiceRoute` shows a static transcript; mic toggle is local UI state only.
-- **Backend & database** — all data is served from in-memory fixtures.
-- **Authentication** — no auth layer; app loads directly.
-- **Billing / subscription** — not modelled.
-- **Automated UI tests** — typecheck + build verification only for this slice.
+- **Real voice / Gemini Live API** — `VoiceRoute` shows a static transcript; mic toggle is local UI state only. Real audio is SP3.
+- **Authentication** — no auth layer; app loads directly. Auth is SP4.
+- **Billing / subscription** — not modelled. Billing is SP5.
 
 ---
 
