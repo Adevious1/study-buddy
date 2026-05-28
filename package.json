@@ -4,9 +4,17 @@
   "private": true,
   "description": "Study Buddy — a K-5 voice-led tutor anchored on Pip, a friendly mascot.",
   "scripts": {
-    "dev": "pnpm --filter @study-buddy/web dev",
-    "build": "pnpm --filter @study-buddy/web build",
+    "dev": "docker compose up",
+    "dev:down": "docker compose down",
+    "dev:clean": "docker compose down -v",
+    "dev:logs": "docker compose logs -f",
+    "dev:web": "pnpm --filter @study-buddy/web dev",
+    "dev:server": "pnpm --filter @study-buddy/server dev",
+    "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "preview": "pnpm --filter @study-buddy/web preview"
+    "preview": "pnpm --filter @study-buddy/web preview",
+    "db:generate": "pnpm --filter @study-buddy/server db:generate",
+    "db:studio": "pnpm --filter @study-buddy/server db:studio",
+    "db:seed": "docker compose exec server bun run apps/server/src/db/seed.ts"
   }
 }
