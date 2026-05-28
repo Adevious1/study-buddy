@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { requestLogger } from './logging';
 import { healthRoute } from './routes/health';
+import { childrenRoute } from './routes/children';
 import { childContext, type ChildVariables } from './lib/childContext';
 
 export const app = new Hono();
@@ -10,9 +11,7 @@ app.route('/', healthRoute);
 const api = new Hono<{ Variables: ChildVariables }>();
 api.use('/children/:childId/*', childContext);
 api.use('/children/:childId', childContext);
-// Stub: returning the loaded child row proves the middleware works.
-// Real route (returning the refined Student shape) lands in Task 7.
-api.get('/children/:childId', (c) => c.json(c.get('child')));
+api.route('/children', childrenRoute);
 
 app.route('/api', api);
 

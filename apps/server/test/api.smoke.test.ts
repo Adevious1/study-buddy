@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'bun:test';
-import { ensureTestDb, setDatabaseUrl } from './setup';
+import { ensureTestDb, setDatabaseUrl, migrateAndSeedTestDb } from './setup';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: { fetch: (req: Request) => Response | Promise<Response> };
@@ -7,6 +7,7 @@ let app: { fetch: (req: Request) => Response | Promise<Response> };
 beforeAll(async () => {
   await ensureTestDb();
   setDatabaseUrl();
+  await migrateAndSeedTestDb();
   // Import after env is set so client.ts picks up the test URL.
   ({ app } = await import('../src/index'));
 });
@@ -37,5 +38,25 @@ describe('child context middleware', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(body.error.code).toBe('child_not_found');
+  });
+});
+
+const MAYA_ID = '00000000-0000-0000-0000-000000000001';
+
+describe('GET /api/children/:childId', () => {
+  it('returns the student record with raw fields, no display strings', async () => {
+    const res = await app.fetch(new Request(`http://test/api/children/${MAYA_ID}`));
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(body.id).toBe(MAYA_ID);
+    expect(body.name).toBe('Maya');
+    expect(body.birthDate).toBe('2017-09-15');
+    expect(body.grade).toBe(3);
+    expect(['coral', 'mint', 'lavender', 'sun', 'sky']).toContain(body.pipColor);
+    expect(typeof body.startedWithPipOn).toBe('string');
+    expect(typeof body.streakDays).toBe('number');
+    expect(body).not.toHaveProperty('ageLabel');
+    expect(body).not.toHaveProperty('guardianId');
   });
 });

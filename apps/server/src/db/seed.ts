@@ -164,7 +164,11 @@ async function main() {
   await sql.end();
 }
 
-main().catch((err) => {
-  console.error('[seed] failed:', err);
-  process.exit(1);
-});
+export { main as seedMain };
+
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error('[seed] failed:', err);
+    process.exit(1);
+  });
+}
