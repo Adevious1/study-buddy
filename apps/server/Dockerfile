@@ -13,7 +13,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS dev
 COPY . .
 ENTRYPOINT ["/app/apps/server/docker-entrypoint.sh"]
-CMD ["bun", "run", "--watch", "apps/server/src/index.ts"]
+CMD ["bun", "--watch", "src/index.ts"]
 
 FROM deps AS build
 COPY . .
@@ -27,4 +27,4 @@ COPY --from=build /app/packages/shared /app/packages/shared
 WORKDIR /app
 EXPOSE 3001
 ENTRYPOINT ["/app/apps/server/docker-entrypoint.sh"]
-CMD ["bun", "run", "apps/server/src/index.ts"]
+CMD ["bun", "src/index.ts"]

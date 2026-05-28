@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: studybuddy
+      POSTGRES_PASSWORD: studybuddy
+      POSTGRES_DB: studybuddy
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studybuddy -d studybuddy"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      target: dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://studybuddy:studybuddy@postgres:5432/studybuddy
+      PORT: "3001"
+      NODE_ENV: development
+    volumes:
+      - ./apps/server:/app/apps/server
+      - ./packages/shared:/app/packages/shared
+      - server_node_modules:/app/node_modules
+      - server_pkg_node_modules:/app/apps/server/node_modules
+      - shared_node_modules:/app/packages/shared/node_modules
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test:
+        - "CMD"
+        - "bun"
+        - "-e"
+        - "fetch('http://localhost:3001/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      VITE_API_TARGET: http://server:3001
+      VITE_CURRENT_CHILD_ID: 00000000-0000-0000-0000-000000000001
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages/shared:/app/packages/shared
+      - web_node_modules:/app/node_modules
+      - web_pkg_node_modules:/app/apps/web/node_modules
+    ports:
+      - "5173:5173"
+
+volumes:
+  pgdata:
+  server_node_modules:
+  server_pkg_node_modules:
+  shared_node_modules:
+  web_node_modules:
+  web_pkg_node_modules:
