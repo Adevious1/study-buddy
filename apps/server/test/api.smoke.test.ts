@@ -134,3 +134,26 @@ describe('GET /api/children/:childId/subjects', () => {
     expect(body.find((s: { kind: string }) => s.kind === 'reading').topic).toBe("Charlotte's Web");
   });
 });
+
+describe('GET /api/children/:childId/learning-profile', () => {
+  it('returns the learning profile with traits as raw rows', async () => {
+    const res = await app.fetch(
+      new Request(`http://test/api/children/${MAYA_ID}/learning-profile`),
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(typeof body.note).toBe('string');
+    expect(Array.isArray(body.traits)).toBe(true);
+    expect(body.traits.length).toBe(4);
+    const ids = body.traits.map((t: { traitId: string }) => t.traitId).sort();
+    expect(ids).toEqual(['auditory', 'kinesthetic', 'narrative', 'visual']);
+    for (const t of body.traits) {
+      expect(typeof t.label).toBe('string');
+      expect(t.score).toBeGreaterThanOrEqual(0);
+      expect(t.score).toBeLessThanOrEqual(100);
+      expect(t).not.toHaveProperty('color');
+      expect(t).not.toHaveProperty('id');
+    }
+  });
+});
