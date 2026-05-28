@@ -157,3 +157,29 @@ describe('GET /api/children/:childId/learning-profile', () => {
     }
   });
 });
+
+describe('GET /api/children/:childId/activity?range=week', () => {
+  it('derives the week activity with 7 bars and raw seconds', async () => {
+    const res = await app.fetch(
+      new Request(`http://test/api/children/${MAYA_ID}/activity?range=week`),
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(Array.isArray(body.bars)).toBe(true);
+    expect(body.bars.length).toBe(7);
+    for (const b of body.bars) {
+      expect(b).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThanOrEqual(100);
+    }
+    expect(typeof body.totalSeconds).toBe('number');
+    expect(body.totalSeconds).toBeGreaterThan(0);
+    expect(typeof body.deltaSeconds).toBe('number');
+    expect(Array.isArray(body.doneDays)).toBe(true);
+    expect(typeof body.todayIndex).toBe('number');
+    expect(body.todayIndex).toBeGreaterThanOrEqual(0);
+    expect(body.todayIndex).toBeLessThanOrEqual(6);
+    expect(body).not.toHaveProperty('totalLabel');
+    expect(body).not.toHaveProperty('deltaLabel');
+  });
+});

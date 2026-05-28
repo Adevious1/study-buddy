@@ -6,6 +6,7 @@ import { sessionsRoute } from './routes/sessions';
 import { assignmentsRoute } from './routes/assignments';
 import { subjectsRoute } from './routes/subjects';
 import { learningProfileRoute } from './routes/learningProfile';
+import { activityRoute } from './routes/activity';
 import { childContext, type ChildVariables } from './lib/childContext';
 
 export const app = new Hono();
@@ -20,6 +21,7 @@ api.route('/children', sessionsRoute);
 api.route('/children', assignmentsRoute);
 api.route('/children', subjectsRoute);
 api.route('/children', learningProfileRoute);
+api.route('/children', activityRoute);
 
 app.route('/api', api);
 
