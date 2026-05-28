@@ -38,11 +38,11 @@ function startedAtForWeekday(weekday: number, hour = 16): Date {
   return d;
 }
 
-async function main() {
+async function main(opts: { closeConnection?: boolean } = {}) {
   const [{ count: existing }] = await db.select({ count: count() }).from(children);
   if (existing > 0) {
     console.log('[seed] children table populated; skipping.');
-    await sql.end();
+    if (opts.closeConnection) await sql.end();
     return;
   }
 
@@ -161,13 +161,13 @@ async function main() {
   ]);
 
   console.log('[seed] done.');
-  await sql.end();
+  if (opts.closeConnection) await sql.end();
 }
 
 export { main as seedMain };
 
 if (import.meta.main) {
-  main().catch((err) => {
+  main({ closeConnection: true }).catch((err) => {
     console.error('[seed] failed:', err);
     process.exit(1);
   });

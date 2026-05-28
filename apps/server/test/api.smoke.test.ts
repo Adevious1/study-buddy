@@ -60,3 +60,36 @@ describe('GET /api/children/:childId', () => {
     expect(body).not.toHaveProperty('guardianId');
   });
 });
+
+describe('GET /api/children/:childId/sessions/continue', () => {
+  it('returns the in-progress session as ContinueSession', async () => {
+    const res = await app.fetch(
+      new Request(`http://test/api/children/${MAYA_ID}/sessions/continue`),
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(typeof body.id).toBe('string');
+    expect(body.title).toBe('Fractions with pizza');
+    expect(body.questionIndex).toBe(3);
+    expect(body.questionTotal).toBe(5);
+    expect(body).not.toHaveProperty('progressLabel');
+  });
+});
+
+describe('GET /api/children/:childId/sessions/latest/recap', () => {
+  it('returns the most recently completed session recap', async () => {
+    const res = await app.fetch(
+      new Request(`http://test/api/children/${MAYA_ID}/sessions/latest/recap`),
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any;
+    expect(typeof body.durationSeconds).toBe('number');
+    expect(body.durationSeconds).toBeGreaterThan(0);
+    expect(body.insightTitle).toBe("You're a picture person!");
+    expect(body.insightBadge).toBe('VISUAL +1');
+    expect(Array.isArray(body.figuredOut)).toBe(true);
+    expect(body).not.toHaveProperty('minutes');
+  });
+});
