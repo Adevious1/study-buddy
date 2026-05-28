@@ -1,6 +1,5 @@
-import { mockRepository } from './mockRepository';
+import { apiRepository } from './apiRepository';
 import type { Repository } from './repository';
-
-// Single seam. SP2 swaps this for an API-backed implementation.
-export const repository: Repository = mockRepository;
+export const repository: Repository = apiRepository;
 export type { Repository } from './repository';
+export { CURRENT_CHILD_ID } from './apiRepository';
