@@ -3,6 +3,8 @@ import { requestLogger } from './logging';
 import { healthRoute } from './routes/health';
 import { childrenRoute } from './routes/children';
 import { sessionsRoute } from './routes/sessions';
+import { assignmentsRoute } from './routes/assignments';
+import { subjectsRoute } from './routes/subjects';
 import { childContext, type ChildVariables } from './lib/childContext';
 
 export const app = new Hono();
@@ -14,6 +16,8 @@ api.use('/children/:childId/*', childContext);
 api.use('/children/:childId', childContext);
 api.route('/children', childrenRoute);
 api.route('/children', sessionsRoute);
+api.route('/children', assignmentsRoute);
+api.route('/children', subjectsRoute);
 
 app.route('/api', api);
 

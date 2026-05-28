@@ -93,3 +93,44 @@ describe('GET /api/children/:childId/sessions/latest/recap', () => {
     expect(body).not.toHaveProperty('minutes');
   });
 });
+
+describe('GET /api/children/:childId/assignments/today', () => {
+  it("returns today's assignments as raw Assignment[]", async () => {
+    const res = await app.fetch(
+      new Request(`http://test/api/children/${MAYA_ID}/assignments/today`),
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any[];
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBe(3);
+    const titles = body.map((a: { title: string }) => a.title).sort();
+    expect(titles).toEqual(['-tion words', "Charlotte's Web, Ch. 3", 'Word problems']);
+    for (const a of body) {
+      expect(['math','reading','science','writing','spanish','social']).toContain(a.subjectKind);
+      expect(a).not.toHaveProperty('color');
+      expect(a).not.toHaveProperty('iconKind');
+      expect(a).not.toHaveProperty('subject');
+    }
+  });
+});
+
+describe('GET /api/children/:childId/subjects', () => {
+  it('returns the active subject mix with topics', async () => {
+    const res = await app.fetch(
+      new Request(`http://test/api/children/${MAYA_ID}/subjects`),
+    );
+    expect(res.status).toBe(200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = (await res.json()) as any[];
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBe(6);
+    for (const s of body) {
+      expect(['math','reading','science','writing','spanish','social']).toContain(s.kind);
+      expect(typeof s.topic).toBe('string');
+      expect(s).not.toHaveProperty('color');
+      expect(s).not.toHaveProperty('label');
+    }
+    expect(body.find((s: { kind: string }) => s.kind === 'reading').topic).toBe("Charlotte's Web");
+  });
+});
