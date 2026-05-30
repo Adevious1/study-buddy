@@ -70,6 +70,7 @@ describe('GET /api/children/:childId/sessions/continue', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
     expect(typeof body.id).toBe('string');
+    expect(['math','reading','science','writing','spanish','social']).toContain(body.subjectKind);
     expect(body.title).toBe('Fractions with pizza');
     expect(body.questionIndex).toBe(3);
     expect(body.questionTotal).toBe(5);

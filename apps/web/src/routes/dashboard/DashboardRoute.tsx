@@ -222,7 +222,7 @@ export function DashboardRoute() {
                 {/* CTA buttons */}
                 <div className="flex gap-[10px]" style={{ marginTop: 16 }}>
                   <Button kind="primary" size="md" onClick={() => navigate('/app/voice', {
-                    state: { subjectKind: 'math', topic: continueSession.title, title: continueSession.title },
+                    state: { subjectKind: continueSession.subjectKind, topic: continueSession.title, title: continueSession.title },
                   })}>
                     Pick up where we left off
                   </Button>
@@ -230,7 +230,7 @@ export function DashboardRoute() {
                     kind="ghost"
                     size="md"
                     onClick={() => navigate('/app/voice', {
-                      state: { subjectKind: 'math', topic: continueSession.title, title: continueSession.title },
+                      state: { subjectKind: continueSession.subjectKind, topic: continueSession.title, title: continueSession.title },
                     })}
                     style={{ color: 'rgba(255,255,255,0.85)', boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.2)' }}
                   >

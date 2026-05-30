@@ -170,7 +170,7 @@ export function HomeRoute() {
 
             <div style={{ marginTop: 14 }}>
               <Button kind="primary" size="sm" onClick={() => navigate('/app/voice', {
-                state: { subjectKind: 'math', topic: continueSession.title, title: continueSession.title },
+                state: { subjectKind: continueSession.subjectKind, topic: continueSession.title, title: continueSession.title },
               })}>
                 Pick up where we left off →
               </Button>

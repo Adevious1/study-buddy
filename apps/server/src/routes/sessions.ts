@@ -21,6 +21,7 @@ export const sessionsRoute = new Hono<{ Variables: ChildVariables }>()
     }
     return c.json({
       id: row.id,
+      subjectKind: row.subjectKind,
       title: row.title,
       questionIndex: row.lastQuestionIndex ?? 0,
       questionTotal: row.totalQuestions ?? 0,

@@ -32,6 +32,7 @@ export interface Assignment {
 
 export interface ContinueSession {
   id: string;
+  subjectKind: SubjectKind;
   title: string;
   questionIndex: number;
   questionTotal: number;
