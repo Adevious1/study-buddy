@@ -1,6 +1,13 @@
 import type { MiddlewareHandler } from 'hono';
 
 export const requestLogger: MiddlewareHandler = async (c, next) => {
+  // WebSocket upgrades hijack the connection. Reading c.res afterward would
+  // materialize a default HTTP Response that collides with the upgrade and
+  // closes the socket — so pass these through without touching c.res.
+  if (c.req.header('upgrade')?.toLowerCase() === 'websocket') {
+    await next();
+    return;
+  }
   const start = Date.now();
   await next();
   const duration = Date.now() - start;
