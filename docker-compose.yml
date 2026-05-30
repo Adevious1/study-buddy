@@ -27,6 +27,7 @@ services:
       DATABASE_URL: postgres://studybuddy:studybuddy@postgres:5432/studybuddy
       PORT: "3001"
       NODE_ENV: development
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     volumes:
       - ./apps/server:/app/apps/server
       - ./packages/shared:/app/packages/shared
