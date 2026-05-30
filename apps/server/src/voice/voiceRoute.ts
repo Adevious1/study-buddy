@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { upgradeWebSocket, websocket } from 'hono/bun';
 import type { ClientControl } from '@study-buddy/shared';
-import { childContext, type ChildVariables } from '../lib/childContext';
+import { type ChildVariables } from '../lib/childContext';
 import { createRelay } from './relay';
 import { makeGeminiConnector } from './geminiSession';
 
@@ -12,7 +12,6 @@ export const voiceWebsocket = websocket;
 
 export const voiceRoute = new Hono<{ Variables: ChildVariables }>().get(
   '/:childId/voice',
-  childContext,
   upgradeWebSocket((c) => {
     const childId = c.req.param('childId') ?? '';
     let relay: ReturnType<typeof createRelay> | null = null;

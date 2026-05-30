@@ -21,6 +21,7 @@ export function useVoiceSession() {
   const wsRef = useRef<WebSocket | null>(null);
   const captureRef = useRef<Capture | null>(null);
   const playerRef = useRef<AudioPlayer | null>(null);
+  const mutedRef = useRef(false);
 
   const send = (m: ClientControl) => wsRef.current?.send(JSON.stringify(m));
 
@@ -47,7 +48,7 @@ export function useVoiceSession() {
         if (msg.type === 'ready') {
           try {
             captureRef.current = await startCapture((pcm16) => {
-              if (ws.readyState === WebSocket.OPEN) ws.send(pcm16.buffer as ArrayBuffer);
+              if (!mutedRef.current && ws.readyState === WebSocket.OPEN) ws.send(pcm16.buffer as ArrayBuffer);
             });
           } catch {
             dispatch({ kind: 'server', msg: { type: 'error', code: 'mic-denied', message: 'Mic permission denied.' } });
@@ -71,8 +72,8 @@ export function useVoiceSession() {
     wsRef.current?.close();
   }, []);
 
-  const mute = useCallback(() => send({ type: 'mute' }), []);
-  const unmute = useCallback(() => send({ type: 'unmute' }), []);
+  const mute = useCallback(() => { mutedRef.current = true; send({ type: 'mute' }); }, []);
+  const unmute = useCallback(() => { mutedRef.current = false; send({ type: 'unmute' }); }, []);
 
   useEffect(() => () => {
     captureRef.current?.stop();
