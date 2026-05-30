@@ -7,7 +7,7 @@ import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Flame, Sparkle, SubjectIcon } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
 import { repository, CURRENT_CHILD_ID } from '../../data';
-import { formatDuration, formatDelta, formatStudentSubtitle } from '../../format';
+import { formatDuration, formatDelta, formatProgressLabel } from '../../format';
 import { subjectLabel, subjectTheme } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
 
@@ -34,7 +34,9 @@ export function DashboardRoute() {
     queryFn: () => repository.getTodayAssignments(),
   });
 
-  if (studentQ.isError || continueQ.isError || weekActivityQ.isError || assignmentsQ.isError) {
+  // The continue session is optional (null when nothing is in progress) and
+  // never gates the dashboard.
+  if (studentQ.isError || weekActivityQ.isError || assignmentsQ.isError) {
     return (
       <ErrorState
         onRetry={() => {
@@ -47,18 +49,17 @@ export function DashboardRoute() {
     );
   }
 
-  if (!studentQ.data || !continueQ.data || !weekActivityQ.data || !assignmentsQ.data) {
+  if (!studentQ.data || !weekActivityQ.data || !assignmentsQ.data || continueQ.isPending) {
     return <div className="min-h-screen w-full bg-bg" />;
   }
 
   const student = studentQ.data;
-  const continueSession = continueQ.data;
+  const continueSession = continueQ.data ?? null;
   const weekActivity = weekActivityQ.data;
   const assignments = assignmentsQ.data;
 
   const nameInitial = student.name.charAt(0).toUpperCase();
-  const subtitle = formatStudentSubtitle(student);
-  const gradeLabel = subtitle.split('·')[1]?.trim() ?? 'Grade 3';
+  const gradeLabel = `Grade ${student.grade}`;
 
   return (
     <div className="min-h-screen w-full flex bg-bg font-body">
@@ -187,49 +188,74 @@ export function DashboardRoute() {
               <Pip size={170} state="speak" color={pipColorValue} expression="happy" shadow={false} />
             </div>
 
-            {/* In-progress badge */}
-            <div
-              className="inline-block font-mono font-bold uppercase tracking-[0.6px]"
-              style={{
-                fontSize: 11,
-                padding: '5px 12px',
-                borderRadius: 99,
-                background: 'rgba(255,255,255,0.12)',
-              }}
-            >
-              In progress
-            </div>
+            {continueSession ? (
+              <>
+                {/* In-progress badge */}
+                <div
+                  className="inline-block font-mono font-bold uppercase tracking-[0.6px]"
+                  style={{
+                    fontSize: 11,
+                    padding: '5px 12px',
+                    borderRadius: 99,
+                    background: 'rgba(255,255,255,0.12)',
+                  }}
+                >
+                  In progress
+                </div>
 
-            {/* Title */}
-            <div
-              className="font-display font-extrabold"
-              style={{ fontSize: 32, lineHeight: 1.05, marginTop: 12, maxWidth: '60%' }}
-            >
-              {continueSession.title}
-            </div>
+                {/* Title */}
+                <div
+                  className="font-display font-extrabold"
+                  style={{ fontSize: 32, lineHeight: 1.05, marginTop: 12, maxWidth: '60%' }}
+                >
+                  {continueSession.title}
+                </div>
 
-            {/* Sub-copy */}
-            <div
-              className="font-semibold"
-              style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 8, maxWidth: '55%' }}
-            >
-              You and Pip stopped at question {continueSession.questionIndex} of {continueSession.questionTotal}. Ready to keep going?
-            </div>
+                {/* Sub-copy */}
+                <div
+                  className="font-semibold"
+                  style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 8, maxWidth: '55%' }}
+                >
+                  {formatProgressLabel(continueSession)}. Ready to keep going?
+                </div>
 
-            {/* CTA buttons */}
-            <div className="flex gap-[10px]" style={{ marginTop: 16 }}>
-              <Button kind="primary" size="md" onClick={() => navigate('/app/voice')}>
-                Pick up where we left off
-              </Button>
-              <Button
-                kind="ghost"
-                size="md"
-                onClick={() => navigate('/app/voice')}
-                style={{ color: 'rgba(255,255,255,0.85)', boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.2)' }}
-              >
-                Replay
-              </Button>
-            </div>
+                {/* CTA buttons */}
+                <div className="flex gap-[10px]" style={{ marginTop: 16 }}>
+                  <Button kind="primary" size="md" onClick={() => navigate('/app/voice')}>
+                    Pick up where we left off
+                  </Button>
+                  <Button
+                    kind="ghost"
+                    size="md"
+                    onClick={() => navigate('/app/voice')}
+                    style={{ color: 'rgba(255,255,255,0.85)', boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.2)' }}
+                  >
+                    Replay
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* No session in progress yet */}
+                <div
+                  className="font-display font-extrabold"
+                  style={{ fontSize: 32, lineHeight: 1.05, maxWidth: '60%' }}
+                >
+                  Ready when you are
+                </div>
+                <div
+                  className="font-semibold"
+                  style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 8, maxWidth: '55%' }}
+                >
+                  Nothing in progress right now — start a fresh session with Pip.
+                </div>
+                <div className="flex gap-[10px]" style={{ marginTop: 16 }}>
+                  <Button kind="primary" size="md" onClick={() => navigate('/app/voice')}>
+                    Start a session
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Stats column */}
@@ -246,7 +272,11 @@ export function DashboardRoute() {
                 <span className="font-display font-extrabold text-ink" style={{ fontSize: 36 }}>
                   {formatDuration(weekActivity.totalSeconds)}
                 </span>
-                <span className="font-bold text-[12px] text-mint">
+                <span
+                  className={`font-bold text-[12px] ${
+                    weekActivity.deltaSeconds >= 0 ? 'text-mint' : 'text-ink-3'
+                  }`}
+                >
                   {formatDelta(weekActivity.deltaSeconds)}
                 </span>
               </div>
@@ -303,6 +333,19 @@ export function DashboardRoute() {
           <SectionTitle action="See all subjects →">Today's adventures</SectionTitle>
         </div>
 
+        {assignments.length === 0 ? (
+          <Card
+            className="border-[1.5px] border-line text-center"
+            style={{ borderRadius: 22, padding: 24 }}
+          >
+            <div className="font-display font-bold text-ink" style={{ fontSize: 16 }}>
+              Nothing scheduled today
+            </div>
+            <div className="font-semibold text-[13px] text-ink-3" style={{ marginTop: 4 }}>
+              Pick any subject to start a session with Pip.
+            </div>
+          </Card>
+        ) : (
         <div
           style={{
             display: 'grid',
@@ -361,6 +404,7 @@ export function DashboardRoute() {
             );
           })}
         </div>
+        )}
 
         {/* Open app link — bottom of main */}
         <div className="flex justify-end" style={{ marginTop: 24 }}>

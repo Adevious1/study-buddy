@@ -8,6 +8,7 @@ import { Star, Sparkle } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
 import { repository, CURRENT_CHILD_ID } from '../../data';
 import { formatMinutes } from '../../format';
+import { subjectLabel } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
 
 // Inline confetti dot positions / colors from the reference
@@ -44,12 +45,30 @@ export function RecapRoute() {
     );
   }
 
-  if (!recapQ.data || !studentQ.data) {
+  if (!studentQ.data || recapQ.isPending) {
     return <div className="flex-1 bg-bg" />;
   }
 
-  const recap = recapQ.data;
   const student = studentQ.data;
+  const recap = recapQ.data ?? null;
+
+  // No completed session to recap yet — a normal state, not an error.
+  if (!recap) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-bg px-8 text-center">
+        <Pip size={104} state="idle" color={pipColorValue} expression="happy" />
+        <div className="font-display font-extrabold text-[22px] text-ink">
+          No recap yet
+        </div>
+        <div className="font-body font-semibold text-[14px] text-ink-2">
+          Finish a session with Pip and your recap will show up here.
+        </div>
+        <Button kind="primary" size="md" onClick={() => navigate('/app/voice')}>
+          Start a session
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col bg-bg overflow-auto sb-scroll">
@@ -84,7 +103,7 @@ export function RecapRoute() {
         </div>
 
         <div className="mt-1.5 font-body font-semibold text-[14px] text-ink-2">
-          You and Pip just spent <b>{formatMinutes(recap.durationSeconds)} minutes</b> on word problems.
+          You and Pip just spent <b>{formatMinutes(recap.durationSeconds)} minutes</b> on {subjectLabel(recap.subjectKind).toLowerCase()}.
         </div>
       </div>
 

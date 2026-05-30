@@ -71,6 +71,7 @@ export interface RecapItem {
 }
 
 export interface RecapResult {
+  subjectKind: SubjectKind;
   durationSeconds: number;
   starsEarned: number;
   starsMax: number;

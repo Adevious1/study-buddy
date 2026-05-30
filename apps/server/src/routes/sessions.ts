@@ -51,6 +51,7 @@ export const sessionsRoute = new Hono<{ Variables: ChildVariables }>()
       Math.round((row.endedAt.getTime() - row.startedAt.getTime()) / 1000),
     );
     return c.json({
+      subjectKind: row.subjectKind,
       durationSeconds,
       starsEarned: row.starsEarned ?? 0,
       starsMax: row.starsMax ?? 0,

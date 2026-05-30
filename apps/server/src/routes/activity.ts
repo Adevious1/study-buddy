@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, eq, gte, isNotNull } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import { db } from '../db/client';
 import { sessions } from '../db/schema';
 import type { ChildVariables } from '../lib/childContext';
@@ -41,6 +41,9 @@ export const activityRoute = new Hono<{ Variables: ChildVariables }>().get(
           eq(sessions.state, 'completed'),
           isNotNull(sessions.endedAt),
           gte(sessions.endedAt, lastWeekStart),
+          // A completed session ended in the past; never count future-dated rows
+          // into this week's bars/totals.
+          lte(sessions.endedAt, now),
         ),
       );
 

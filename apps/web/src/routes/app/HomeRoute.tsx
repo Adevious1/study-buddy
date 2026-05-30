@@ -28,7 +28,9 @@ export function HomeRoute() {
     queryFn: () => repository.getTodayAssignments(),
   });
 
-  if (studentQ.isError || continueQ.isError || assignmentsQ.isError) {
+  // The continue session is optional — a child with no in-progress session is a
+  // normal state (repository returns null), so it never gates the screen.
+  if (studentQ.isError || assignmentsQ.isError) {
     return (
       <ErrorState
         onRetry={() => {
@@ -40,12 +42,12 @@ export function HomeRoute() {
     );
   }
 
-  if (!studentQ.data || !continueQ.data || !assignmentsQ.data) {
+  if (!studentQ.data || !assignmentsQ.data || continueQ.isPending) {
     return <div className="min-h-full bg-bg" />;
   }
 
   const student = studentQ.data;
-  const continueSession = continueQ.data;
+  const continueSession = continueQ.data ?? null;
   const assignments = assignmentsQ.data;
 
   return (
@@ -123,63 +125,79 @@ export function HomeRoute() {
       <div style={{ padding: '14px 16px 4px' }}>
         <SectionTitle action="See all">Today's adventures</SectionTitle>
 
-        {/* Continue last session — featured dark card */}
-        <Card
-          style={{
-            background: 'var(--color-ink)',
-            borderRadius: 24,
-            padding: 18,
-            marginBottom: 10,
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Peeking Pip */}
-          <div style={{ position: 'absolute', right: -20, top: -10, opacity: 0.85 }}>
-            <Pip size={110} state="idle" color={pipColorValue} expression="curious" shadow={false} />
-          </div>
-
-          <div
-            className="font-mono text-[10px] font-bold uppercase tracking-[0.6px] text-white"
+        {/* Continue last session — featured dark card (only when one exists) */}
+        {continueSession && (
+          <Card
             style={{
-              display: 'inline-block',
-              padding: '4px 10px',
-              borderRadius: 99,
-              background: 'rgba(255,255,255,0.12)',
+              background: 'var(--color-ink)',
+              borderRadius: 24,
+              padding: 18,
+              marginBottom: 10,
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
-            Continue
-          </div>
+            {/* Peeking Pip */}
+            <div style={{ position: 'absolute', right: -20, top: -10, opacity: 0.85 }}>
+              <Pip size={110} state="idle" color={pipColorValue} expression="curious" shadow={false} />
+            </div>
 
-          <div
-            className="font-display font-extrabold text-white"
-            style={{ fontSize: 22, marginTop: 10, maxWidth: '70%', lineHeight: 1.1 }}
-          >
-            {continueSession.title}
-          </div>
+            <div
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.6px] text-white"
+              style={{
+                display: 'inline-block',
+                padding: '4px 10px',
+                borderRadius: 99,
+                background: 'rgba(255,255,255,0.12)',
+              }}
+            >
+              Continue
+            </div>
 
-          <div
-            className="font-body text-[13px] font-semibold"
-            style={{ color: 'rgba(255,255,255,0.7)', marginTop: 6 }}
-          >
-            {formatProgressLabel(continueSession)}
-          </div>
+            <div
+              className="font-display font-extrabold text-white"
+              style={{ fontSize: 22, marginTop: 10, maxWidth: '70%', lineHeight: 1.1 }}
+            >
+              {continueSession.title}
+            </div>
 
-          <div style={{ marginTop: 14 }}>
-            <Button kind="primary" size="sm" onClick={() => navigate('/app/voice')}>
-              Pick up where we left off →
-            </Button>
-          </div>
-        </Card>
+            <div
+              className="font-body text-[13px] font-semibold"
+              style={{ color: 'rgba(255,255,255,0.7)', marginTop: 6 }}
+            >
+              {formatProgressLabel(continueSession)}
+            </div>
+
+            <div style={{ marginTop: 14 }}>
+              <Button kind="primary" size="sm" onClick={() => navigate('/app/voice')}>
+                Pick up where we left off →
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Assignment list */}
-        {assignments.map((a, i) => (
-          <AssignmentCard
-            key={a.id}
-            assignment={a}
-            last={i === assignments.length - 1}
-          />
-        ))}
+        {assignments.length > 0 ? (
+          assignments.map((a, i) => (
+            <AssignmentCard
+              key={a.id}
+              assignment={a}
+              last={i === assignments.length - 1}
+            />
+          ))
+        ) : (
+          <Card
+            className="text-center"
+            style={{ background: 'var(--color-surface)', borderRadius: 20, padding: 20 }}
+          >
+            <div className="font-display text-[15px] font-bold text-ink">
+              Nothing scheduled today
+            </div>
+            <div className="font-body text-[13px] font-semibold text-ink-3" style={{ marginTop: 4 }}>
+              Tap a subject anytime to start a session with Pip.
+            </div>
+          </Card>
+        )}
       </div>
 
       <div style={{ height: 24 }} />

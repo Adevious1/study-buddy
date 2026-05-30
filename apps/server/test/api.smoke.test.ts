@@ -87,6 +87,7 @@ describe('GET /api/children/:childId/sessions/latest/recap', () => {
     const body = (await res.json()) as any;
     expect(typeof body.durationSeconds).toBe('number');
     expect(body.durationSeconds).toBeGreaterThan(0);
+    expect(['math','reading','science','writing','spanish','social']).toContain(body.subjectKind);
     expect(body.insightTitle).toBe("You're a picture person!");
     expect(body.insightBadge).toBe('VISUAL +1');
     expect(Array.isArray(body.figuredOut)).toBe(true);

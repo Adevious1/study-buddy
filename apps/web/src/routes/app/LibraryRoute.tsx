@@ -83,6 +83,21 @@ export function LibraryRoute() {
       </div>
 
       {/* Subject grid */}
+      {subjects.length === 0 ? (
+        <div style={{ padding: '4px 16px 16px' }}>
+          <Card
+            className="text-center"
+            style={{ background: 'var(--color-surface)', borderRadius: 22, padding: 24 }}
+          >
+            <div className="font-display text-[15px] font-bold text-ink">
+              No subjects yet
+            </div>
+            <div className="font-body text-[13px] font-semibold text-ink-3" style={{ marginTop: 4 }}>
+              You can still tap “Just talk with Pip” above to get started.
+            </div>
+          </Card>
+        </div>
+      ) : (
       <div
         style={{
           padding: '4px 16px 16px',
@@ -131,6 +146,7 @@ export function LibraryRoute() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

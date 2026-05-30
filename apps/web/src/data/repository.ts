@@ -5,10 +5,13 @@ import type {
 
 export interface Repository {
   getStudent(): Promise<Student>;
-  getContinueSession(): Promise<ContinueSession>;
+  /** null when there is no in-progress session yet (a normal, expected state). */
+  getContinueSession(): Promise<ContinueSession | null>;
   getTodayAssignments(): Promise<Assignment[]>;
   getSubjects(): Promise<Subject[]>;
-  getLearningProfile(): Promise<LearningProfile>;
+  /** null when the child has no learning profile yet. */
+  getLearningProfile(): Promise<LearningProfile | null>;
   getWeekActivity(): Promise<WeekActivity>;
-  getRecap(): Promise<RecapResult>;
+  /** null when the child has no completed session to recap yet. */
+  getRecap(): Promise<RecapResult | null>;
 }
