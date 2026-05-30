@@ -1,11 +1,13 @@
-import { useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import type { SubjectKind } from '@study-buddy/shared';
 import { Pip } from '../../components/Pip';
 import { Waveform } from '../../components/ui/Waveform';
 import { Bubble } from '../../components/ui/Bubble';
-import { HintChip } from '../../components/ui/HintChip';
-import { Sparkle } from '../../components/ui/icons';
+import { ErrorState } from '../../components/atoms/ErrorState';
 import { usePipColor } from '../../state/PipColorContext';
+import { useVoiceSession } from '../../voice/useVoiceSession';
+import { subjectLabel } from '../../theme/subjectTheme';
 
 // ─── Local atoms ───────────────────────────────────────────────
 
@@ -96,144 +98,138 @@ function BigMic({
 
 // ─── Voice Route ───────────────────────────────────────────────
 
-export function VoiceRoute() {
-  const [active, setActive] = useState(true);
-  const navigate = useNavigate();
-  const { pipColorValue } = usePipColor();
+interface VoiceNavState {
+  subjectKind?: SubjectKind;
+  topic?: string;
+  title?: string;
+  chooseSubject?: boolean;
+}
 
-  const voiceState: 'listen' | 'idle' = active ? 'listen' : 'idle';
-  // Brand accent stays fixed (coral) for the mic CTA, rings, dots, and waveform
-  // per the spec; only Pip's body follows the customizable pipColorValue.
+const SUBJECT_CHOICES: { kind: SubjectKind; topic: string }[] = [
+  { kind: 'math', topic: 'Anything in math' },
+  { kind: 'reading', topic: 'Reading together' },
+  { kind: 'science', topic: 'Science questions' },
+  { kind: 'writing', topic: 'Writing help' },
+];
+
+export function VoiceRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { pipColorValue } = usePipColor();
+  const nav = (location.state ?? {}) as VoiceNavState;
+
+  const { state, start, end, mute, unmute } = useVoiceSession();
+  const [muted, setMuted] = useState(false);
+  const [picked, setPicked] = useState<{ subjectKind: SubjectKind; topic: string; title: string } | null>(
+    nav.subjectKind
+      ? { subjectKind: nav.subjectKind, topic: nav.topic ?? '', title: nav.title ?? subjectLabel(nav.subjectKind) }
+      : null,
+  );
+
+  useEffect(() => {
+    if (picked && state.status === 'idle') void start(picked);
+  }, [picked, state.status, start]);
+
+  useEffect(() => {
+    if (state.status === 'ended') navigate('/app');
+  }, [state.status, navigate]);
+
   const accent = 'var(--color-coral)';
+  const pipState = state.status === 'live' ? 'listen' : state.status === 'connecting' ? 'think' : 'idle';
+  const subjectTitle = useMemo(() => picked?.title ?? 'Talk with Pip', [picked]);
+
+  if (state.error) {
+    return (
+      <ErrorState
+        title={state.error === 'mic-denied' ? 'Pip needs your microphone' : 'Pip had trouble'}
+        onRetry={() => navigate('/app')}
+      />
+    );
+  }
+
+  if (!picked && nav.chooseSubject) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 bg-bg px-8">
+        <Pip size={120} state="idle" color={pipColorValue} expression="happy" />
+        <div className="font-display font-extrabold text-[22px] text-ink">What should we work on?</div>
+        <div className="grid grid-cols-2 gap-3">
+          {SUBJECT_CHOICES.map((c) => (
+            <button
+              key={c.kind}
+              className="rounded-[18px] border-[1.5px] border-line bg-surface px-5 py-4 font-display font-bold text-ink"
+              onClick={() => setPicked({ subjectKind: c.kind, topic: c.topic, title: subjectLabel(c.kind) })}
+            >
+              {subjectLabel(c.kind)}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       className="flex-1 flex flex-col overflow-hidden"
-      style={{
-        background: `radial-gradient(80% 60% at 50% 0%, var(--color-coral-l) 0%, var(--color-bg) 65%)`,
-      }}
+      style={{ background: `radial-gradient(80% 60% at 50% 0%, var(--color-coral-l) 0%, var(--color-bg) 65%)` }}
     >
-      {/* Top bar — session context */}
       <div className="flex items-center gap-3 px-[18px] py-3">
-        {/* Back chevron */}
         <button
           className="w-9 h-9 rounded-full flex items-center justify-center border-[1.5px] border-line cursor-pointer"
           style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)' }}
-          onClick={() => navigate('/app')}
+          onClick={() => { end(); }}
+          aria-label="Back"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M15 5 L8 12 L15 19"
-              stroke="var(--color-ink)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <path d="M15 5 L8 12 L15 19" stroke="var(--color-ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-
-        {/* Center: subject + question */}
         <div className="flex-1 text-center">
           <div className="font-body font-bold text-[11px] text-ink-3 uppercase tracking-[0.6px]">
-            Math · Word problems
+            {picked ? subjectLabel(picked.subjectKind) : 'Pip'} · {picked?.topic ?? 'Live'}
           </div>
-          <div className="font-display font-bold text-[16px] text-ink">
-            Question 3 of 5
-          </div>
+          <div className="font-display font-bold text-[16px] text-ink">{subjectTitle}</div>
         </div>
-
-        {/* Timer */}
         <div
           className="px-3 py-[6px] rounded-full border-[1.5px] border-line font-mono text-[12px] font-bold text-ink-2"
           style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)' }}
         >
-          12:34
+          {state.status === 'resuming' ? 'one sec…' : state.status === 'connecting' ? 'connecting…' : 'live'}
         </div>
       </div>
 
-      {/* Progress dots */}
-      <div className="flex justify-center gap-[6px] mb-1">
-        {[1, 1, 1, 0, 0].map((on, i) => (
-          <div
-            key={i}
-            className="h-2 rounded-full transition-[width] duration-200"
-            style={{
-              width: i === 2 ? 22 : 8,
-              background: on ? accent : 'var(--color-line)',
-            }}
-          />
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 pt-2">
+        <Pip size={180} state={pipState} color={pipColorValue} expression="happy" />
+        <div className="inline-flex items-center gap-2 px-[14px] py-2 bg-surface border-[1.5px] border-line rounded-full font-body font-bold text-[13px] text-ink-2 shadow-[0_2px_0_rgba(0,0,0,0.04)]">
+          {state.status === 'live' && !muted ? <Waveform color={accent} height={14} bars={4} /> : <div className="w-2 h-2 rounded-full" style={{ background: 'var(--color-ink-4)' }} />}
+          <span>{muted ? 'Muted' : state.status === 'live' ? 'Listening…' : state.status === 'resuming' ? 'One sec…' : 'Connecting…'}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 px-[18px] pt-3 pb-1">
+        {state.turns.slice(-2).map((t, i) => (
+          <Bubble key={i} from={t.role === 'pip' ? 'pip' : 'user'}>{t.text}</Bubble>
         ))}
       </div>
 
-      {/* Pip hero + state chip */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 pt-2">
-        <Pip size={180} state={voiceState} color={pipColorValue} expression="happy" />
-
-        {/* State chip */}
-        <div className="inline-flex items-center gap-2 px-[14px] py-2 bg-surface border-[1.5px] border-line rounded-full font-body font-bold text-[13px] text-ink-2 shadow-[0_2px_0_rgba(0,0,0,0.04)]">
-          {voiceState === 'listen' && (
-            <Waveform color={accent} height={14} bars={4} />
-          )}
-          {voiceState === 'idle' && (
-            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--color-ink-4)' }} />
-          )}
-          <span>{voiceState === 'listen' ? 'Listening…' : 'Paused'}</span>
-        </div>
-      </div>
-
-      {/* Transcript bubbles */}
-      <div className="flex flex-col gap-2 px-[18px] pt-3 pb-1">
-        <Bubble from="pip">
-          If 12 apples are shared between 4 friends, how many does each friend get?
-        </Bubble>
-        <Bubble from="user">
-          Hmm… is it 8?
-        </Bubble>
-      </div>
-
-      {/* Hint chips — horizontal scroll */}
-      <div className="flex gap-2 px-4 pt-[10px] overflow-x-auto sb-scroll">
-        <HintChip icon={<Sparkle size={12} />}>Try drawing it</HintChip>
-        <HintChip>Need a hint?</HintChip>
-        <HintChip>Read again</HintChip>
-        <HintChip>Slower please</HintChip>
-      </div>
-
-      {/* Control row: Mute | BigMic | End */}
       <div className="flex items-center justify-between px-6 pt-[14px] pb-[18px]">
         <ControlBtn
-          label="Mute"
+          label={muted ? 'Unmute' : 'Mute'}
+          onClick={() => { muted ? unmute() : mute(); setMuted((m) => !m); }}
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <rect x="9" y="3" width="6" height="12" rx="3" stroke="var(--color-ink-2)" strokeWidth="2" />
-              <path
-                d="M5 11 C5 15 8 18 12 18 C16 18 19 15 19 11 M12 18 V22"
-                stroke="var(--color-ink-2)"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
+              <path d="M5 11 C5 15 8 18 12 18 C16 18 19 15 19 11 M12 18 V22" stroke="var(--color-ink-2)" strokeWidth="2" strokeLinecap="round" />
             </svg>
           }
         />
-
-        <BigMic
-          accent={accent}
-          active={active}
-          onClick={() => setActive((a) => !a)}
-        />
-
+        <BigMic accent={accent} active={state.status === 'live' && !muted} onClick={() => { muted ? unmute() : mute(); setMuted((m) => !m); }} />
         <ControlBtn
           label="End"
           danger
-          onClick={() => navigate('/app/recap')}
+          onClick={() => end()}
           icon={
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M6 6 L18 18 M18 6 L6 18"
-                stroke="var(--color-coral-d)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
+              <path d="M6 6 L18 18 M18 6 L6 18" stroke="var(--color-coral-d)" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           }
         />

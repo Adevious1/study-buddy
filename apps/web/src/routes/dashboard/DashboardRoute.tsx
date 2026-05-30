@@ -159,7 +159,7 @@ export function DashboardRoute() {
               Hi {student.name}!
             </div>
           </div>
-          <Button kind="primary" size="md" onClick={() => navigate('/app/voice')}>
+          <Button kind="primary" size="md" onClick={() => navigate('/app/voice', { state: { chooseSubject: true } })}>
             Start a session
           </Button>
         </div>
@@ -221,13 +221,17 @@ export function DashboardRoute() {
 
                 {/* CTA buttons */}
                 <div className="flex gap-[10px]" style={{ marginTop: 16 }}>
-                  <Button kind="primary" size="md" onClick={() => navigate('/app/voice')}>
+                  <Button kind="primary" size="md" onClick={() => navigate('/app/voice', {
+                    state: { subjectKind: 'math', topic: continueSession.title, title: continueSession.title },
+                  })}>
                     Pick up where we left off
                   </Button>
                   <Button
                     kind="ghost"
                     size="md"
-                    onClick={() => navigate('/app/voice')}
+                    onClick={() => navigate('/app/voice', {
+                      state: { subjectKind: 'math', topic: continueSession.title, title: continueSession.title },
+                    })}
                     style={{ color: 'rgba(255,255,255,0.85)', boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.2)' }}
                   >
                     Replay
@@ -250,7 +254,7 @@ export function DashboardRoute() {
                   Nothing in progress right now — start a fresh session with Pip.
                 </div>
                 <div className="flex gap-[10px]" style={{ marginTop: 16 }}>
-                  <Button kind="primary" size="md" onClick={() => navigate('/app/voice')}>
+                  <Button kind="primary" size="md" onClick={() => navigate('/app/voice', { state: { chooseSubject: true } })}>
                     Start a session
                   </Button>
                 </div>
@@ -397,7 +401,9 @@ export function DashboardRoute() {
                 </div>
 
                 {/* CTA */}
-                <Button kind="soft" size="sm" full onClick={() => navigate('/app/voice')}>
+                <Button kind="soft" size="sm" full onClick={() => navigate('/app/voice', {
+                  state: { subjectKind: a.subjectKind, topic: a.title, title: a.title },
+                })}>
                   Start →
                 </Button>
               </Card>

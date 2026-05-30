@@ -54,7 +54,7 @@ export function LibraryRoute() {
             position: 'relative',
             overflow: 'hidden',
           }}
-          onClick={() => navigate('/app/voice')}
+          onClick={() => navigate('/app/voice', { state: { chooseSubject: true } })}
         >
           <Pip size={64} state="speak" color={pipColorValue} expression="happy" shadow={false} />
           <div className="min-w-0 flex-1">
@@ -118,7 +118,9 @@ export function LibraryRoute() {
                 padding: 14,
                 minHeight: 130,
               }}
-              onClick={() => navigate('/app/voice')}
+              onClick={() => navigate('/app/voice', {
+                state: { subjectKind: s.kind, topic: s.topic, title: subjectLabel(s.kind) },
+              })}
             >
               <div
                 className="flex items-center justify-center"
