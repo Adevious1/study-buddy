@@ -11,6 +11,9 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
         changeOrigin: true,
+        // Proxy WebSocket upgrades too — the SP3 voice relay connects at
+        // /api/children/:childId/voice and needs the ws upgrade forwarded.
+        ws: true,
       },
     },
   },
