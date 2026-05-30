@@ -8,6 +8,7 @@ import { subjectsRoute } from './routes/subjects';
 import { learningProfileRoute } from './routes/learningProfile';
 import { activityRoute } from './routes/activity';
 import { childContext, type ChildVariables } from './lib/childContext';
+import { voiceRoute, voiceWebsocket } from './voice/voiceRoute';
 
 export const app = new Hono();
 app.use('*', requestLogger);
@@ -22,6 +23,7 @@ api.route('/children', assignmentsRoute);
 api.route('/children', subjectsRoute);
 api.route('/children', learningProfileRoute);
 api.route('/children', activityRoute);
+api.route('/children', voiceRoute);
 
 app.route('/api', api);
 
@@ -33,5 +35,5 @@ app.onError((err, c) => {
 const port = Number(process.env.PORT ?? 3001);
 if (import.meta.main) {
   console.log(`[server] listening on :${port}`);
-  Bun.serve({ port, fetch: app.fetch });
+  Bun.serve({ port, fetch: app.fetch, websocket: voiceWebsocket });
 }
