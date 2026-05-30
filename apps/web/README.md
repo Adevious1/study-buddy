@@ -77,9 +77,25 @@ Screens fetch via [TanStack Query](https://tanstack.com/query) (`@tanstack/react
 
 ---
 
+## Live voice (`/app/voice`)
+
+The voice screen is wired to the Gemini Live relay via `useVoiceSession` (SP3).
+On navigation to `/app/voice` (via a subject or the free-talk chooser) the hook
+upgrades a WebSocket to `GET /api/children/:childId/voice`, requests mic
+permission, and streams audio in both directions. The live transcript updates in
+real time for both child and Pip turns.
+
+**Requirements:**
+- The server must have `GEMINI_API_KEY` set — the API key is server-side only.
+- The browser must grant microphone permission; if denied, `ErrorState` shows
+  "Pip needs your microphone".
+
+See `apps/server/README.md` for the environment variable and `docs/superpowers/SP3-manual-smoke.md` for the manual smoke checklist.
+
+---
+
 ## Deferred subsystems
 
-- **Real voice / Gemini Live API** — `VoiceRoute` shows a static transcript; mic toggle is local UI state only. Real audio is SP3.
 - **Authentication** — no auth layer; app loads directly. Auth is SP4.
 - **Billing / subscription** — not modelled. Billing is SP5.
 

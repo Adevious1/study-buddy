@@ -10,9 +10,21 @@ The design spec lives in `docs/superpowers/specs/`.
 
 ## Status
 
-**Early build.** Sub-project 1 (UI foundation) is specced and approved; other
-subsystems are not built yet. Keep this file honest — only document what is
-actually true in the repo.
+**SP1 (UI foundation) and SP2 (backend + database) are done.
+SP3 (live voice tutor) is implemented** — browser ⇄ Hono WS relay ⇄ Gemini Live
+(`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
+live transcript, and learning-style detection via function calling committing
+bounded trait deltas at session end.
+
+The live audio loop requires a real `GEMINI_API_KEY` and a browser; it has NOT
+been smoke-tested in CI. See `docs/superpowers/SP3-manual-smoke.md` for the
+checklist.
+
+**Deferred to a later effort:** auto-generated session recap, transcript
+persistence, LLM-written profile notes, interactive hint chips, true subjectless
+free-talk, and transparent mid-session reconnect across Gemini's ~10-min
+connection reset (the soft-cap + abandoned-on-disconnect paths ARE implemented;
+the seamless resumption reconnect is the remaining seam).
 
 ## Architecture (committed decisions)
 
@@ -37,14 +49,16 @@ actually true in the repo.
 Built in order; each is independently demoable and gets its own spec → plan →
 implementation cycle. **Do not collapse these into one effort.**
 
-1. **UI foundation** ← _current_ — design system, Pip, atoms, all six screens, two
+1. **UI foundation** ✓ _done_ — design system, Pip, atoms, all six screens, two
    route trees, navigation, on mock data. No backend.
-2. **Backend + database** — TS relay/API server, Postgres + Drizzle schema
+2. **Backend + database** ✓ _done_ — TS relay/API server, Postgres + Drizzle schema
    (guardians, children, sessions, learning_profiles, plans); web app swaps mock
    data for real queries.
-3. **Live voice tutor** (the hero) — mic capture + playback, WS relay to Gemini
-   Live, Socratic system prompt, live transcript, learning-style detection via
-   function calling writing profile deltas.
+3. **Live voice tutor** ✓ _implemented_ — mic capture + playback, WS relay to Gemini
+   Live (`gemini-3.1-flash-live-preview`), Socratic system prompt, live transcript,
+   learning-style detection via function calling writing bounded trait deltas.
+   Deferred items: session recap, transcript persistence, LLM profile notes,
+   hint chips, subjectless free-talk, and mid-session seamless reconnect.
 4. **Auth** — `better-auth`, guardian sign-up/login, child-profile switcher, new
    onboarding screens; gates the app.
 5. **Billing** — seat-based subscription + paywall on adding a child.

@@ -1,6 +1,6 @@
 # Study Buddy — API Server
 
-The Hono-on-Bun HTTP/API server for Study Buddy. It serves REST endpoints consumed by the React web client and (in SP3) will host the Gemini Live WebSocket relay.
+The Hono-on-Bun HTTP/API server for Study Buddy. It serves REST endpoints consumed by the React web client and hosts the Gemini Live WebSocket relay (SP3).
 
 ---
 
@@ -90,5 +90,17 @@ All endpoints are mounted under `/api`. Child-scoped endpoints require a `childI
 | `src/routes/subjects.ts` | `GET /api/children/:childId/subjects` |
 | `src/routes/learningProfile.ts` | `GET /api/children/:childId/learning-profile` |
 | `src/routes/activity.ts` | `GET /api/children/:childId/activity` |
+| `src/voice/route.ts` | `GET /api/children/:childId/voice` — WebSocket upgrade; guarded by `childContext`; relays audio to Gemini Live |
 
 Schema: `src/db/schema.ts` — the Drizzle table definitions for guardians, children, assignments, sessions, learning\_profiles, plans, and weekly activity.
+
+---
+
+## Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | Postgres connection string |
+| `GEMINI_API_KEY` | Yes (voice) | Google Gemini API key — used server-side only by the WS relay; the browser never sees it |
+
+Set these in a `.env` file at the repo root (picked up by `docker compose`) or export them directly. Without `GEMINI_API_KEY` the server starts but the `/api/children/:childId/voice` WebSocket will reject with an error.
