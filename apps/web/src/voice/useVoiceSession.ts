@@ -25,6 +25,18 @@ export function useVoiceSession() {
 
   const send = (m: ClientControl) => wsRef.current?.send(JSON.stringify(m));
 
+  const teardown = useCallback(() => {
+    captureRef.current?.stop();
+    captureRef.current = null;
+    playerRef.current?.close();
+    playerRef.current = null;
+    const ws = wsRef.current;
+    // Clear the ref BEFORE closing so the socket's own close/error events fail
+    // the isCurrent() check below and are ignored (intentional teardown).
+    wsRef.current = null;
+    ws?.close();
+  }, []);
+
   const start = useCallback(async (args: StartArgs) => {
     dispatch({ kind: 'connecting' });
     let player: AudioPlayer;
@@ -39,9 +51,14 @@ export function useVoiceSession() {
     const ws = new WebSocket(wsUrl(CURRENT_CHILD_ID));
     ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
+    // Only react to events from the socket that is still the current one. Under
+    // React StrictMode the start effect runs twice (open → teardown → open), so a
+    // superseded socket's late close/error must not surface as an error/ended.
+    const isCurrent = () => wsRef.current === ws;
 
-    ws.onopen = () => send({ type: 'start', ...args });
+    ws.onopen = () => { if (isCurrent()) send({ type: 'start', ...args }); };
     ws.onmessage = async (evt) => {
+      if (!isCurrent()) return;
       if (typeof evt.data === 'string') {
         const msg = JSON.parse(evt.data) as ServerControl;
         if (msg.type === 'interrupted') playerRef.current?.clear();
@@ -61,25 +78,27 @@ export function useVoiceSession() {
         playerRef.current?.enqueue(new Uint8Array(evt.data as ArrayBuffer));
       }
     };
-    ws.onerror = () => dispatch({ kind: 'server', msg: { type: 'error', code: 'connection-lost', message: 'Lost connection.' } });
-    ws.onclose = () => dispatch({ kind: 'server', msg: { type: 'status', state: 'ended' } });
+    ws.onerror = () => {
+      if (isCurrent()) dispatch({ kind: 'server', msg: { type: 'error', code: 'connection-lost', message: 'Lost connection.' } });
+    };
+    ws.onclose = () => {
+      if (isCurrent()) dispatch({ kind: 'server', msg: { type: 'status', state: 'ended' } });
+    };
   }, []);
 
   const end = useCallback(() => {
+    // Send the graceful end first (WS preserves frame order, so the relay
+    // finalizes 'completed' + commits the profile before our close frame hits
+    // its abandoned-on-disconnect path, which finish() no-ops).
     send({ type: 'end' });
-    captureRef.current?.stop();
-    playerRef.current?.close();
-    wsRef.current?.close();
-  }, []);
+    teardown();
+    dispatch({ kind: 'server', msg: { type: 'status', state: 'ended' } });
+  }, [teardown]);
 
   const mute = useCallback(() => { mutedRef.current = true; send({ type: 'mute' }); }, []);
   const unmute = useCallback(() => { mutedRef.current = false; send({ type: 'unmute' }); }, []);
 
-  useEffect(() => () => {
-    captureRef.current?.stop();
-    playerRef.current?.close();
-    wsRef.current?.close();
-  }, []);
+  useEffect(() => teardown, [teardown]);
 
   return { state, start, end, mute, unmute };
 }

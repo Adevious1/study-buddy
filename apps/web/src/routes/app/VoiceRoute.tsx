@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { SubjectKind } from '@study-buddy/shared';
 import { Pip } from '../../components/Pip';
@@ -130,9 +130,18 @@ export function VoiceRoute() {
     if (picked && state.status === 'idle') void start(picked);
   }, [picked, state.status, start]);
 
+  // Track whether the session ever actually connected.
+  const wentLiveRef = useRef(false);
   useEffect(() => {
-    if (state.status === 'ended') navigate('/app');
-  }, [state.status, navigate]);
+    if (state.status === 'live') wentLiveRef.current = true;
+  }, [state.status]);
+
+  // Return Home only when a session that truly went live ends cleanly. A session
+  // that ends without ever connecting — React StrictMode's dev double-mount, a
+  // failed connect, or a mic denial — must NOT bounce; let the error state show.
+  useEffect(() => {
+    if (state.status === 'ended' && wentLiveRef.current && !state.error) navigate('/app');
+  }, [state.status, state.error, navigate]);
 
   const accent = 'var(--color-coral)';
   const pipState = state.status === 'live' ? 'listen' : state.status === 'connecting' ? 'think' : 'idle';
