@@ -13,6 +13,7 @@ export class AudioPlayer {
   }
 
   enqueue(pcm16Bytes: Uint8Array): void {
+    if (this.ctx.state === 'suspended') void this.ctx.resume();
     // Bytes → Int16 (little-endian) → Float32
     const int16 = new Int16Array(
       pcm16Bytes.buffer as ArrayBuffer,
