@@ -148,6 +148,7 @@ export const sessions = pgTable(
     solvedSelf: integer('solved_self'),
     solvedTotal: integer('solved_total'),
     figuredOut: jsonb('figured_out'),
+    transcript: jsonb('transcript'),
     insightTitle: text('insight_title'),
     insightBody: text('insight_body'),
     insightBadge: text('insight_badge'),
