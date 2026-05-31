@@ -155,7 +155,8 @@ export function VoiceRoute() {
   const subjectTitle = useMemo(() => picked?.title ?? 'Talk with Pip', [picked]);
   // Once there are messages, switch to the compact layout (small Pip up top,
   // transcript fills the rest) so long turns are readable instead of clipped.
-  const hasTurns = state.turns.length > 0;
+  const turns = state.turns;
+  const hasTurns = turns.length > 0;
 
   if (state.error) {
     return (
@@ -235,7 +236,7 @@ export function VoiceRoute() {
           ref={transcriptRef}
           className="sb-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-[18px] pt-2 pb-1"
         >
-          {state.turns.map((t, i) => (
+          {turns.map((t, i) => (
             <Bubble key={i} from={t.role === 'pip' ? 'pip' : 'user'}>{t.text}</Bubble>
           ))}
         </div>
