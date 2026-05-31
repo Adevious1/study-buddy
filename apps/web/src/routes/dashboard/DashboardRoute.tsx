@@ -12,6 +12,9 @@ import { formatDuration, formatDelta, formatProgressLabel } from '../../format';
 import { subjectLabel, subjectTheme } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
 import { useActiveChildId } from '../../state/ChildProfileContext';
+import { repositoryMe } from '../auth/me';
+import { startCheckout, openPortal } from '../billing/billingClient';
+import { TrialBanner } from '../../components/TrialBanner';
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
@@ -36,6 +39,8 @@ export function DashboardRoute() {
     queryKey: ['child', childId, 'assignments'],
     queryFn: () => repository.getTodayAssignments(),
   });
+  const meQ = useQuery({ queryKey: ['me'], queryFn: repositoryMe });
+  const ent = meQ.data?.entitlement;
 
   // The continue session is optional (null when nothing is in progress) and
   // never gates the dashboard.
@@ -145,6 +150,11 @@ export function DashboardRoute() {
           </div>
         </div>
 
+        {/* Billing control */}
+        {ent && (ent.status !== null
+          ? <Button kind="ghost" size="sm" onClick={() => { void openPortal(); }} style={{ marginTop: 8 }}>Manage billing</Button>
+          : <Button kind="ghost" size="sm" onClick={() => { void startCheckout(); }} style={{ marginTop: 8 }}>Subscribe</Button>)}
+
         {/* Sign out */}
         <Button
           kind="ghost"
@@ -161,6 +171,9 @@ export function DashboardRoute() {
 
       {/* ── Main ────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-auto sb-scroll" style={{ padding: '24px 32px' }}>
+
+        {/* Trial banner — only visible during the no-card trial */}
+        {ent && <TrialBanner entitlement={ent} />}
 
         {/* Greeting row */}
         <div className="flex items-end justify-between" style={{ marginBottom: 18 }}>
