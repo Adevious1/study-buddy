@@ -34,6 +34,7 @@ dynamic DB-sourced values continue to be injected at runtime.
 | Edit + load model | **Checked-in file, hot-reloaded** — read fresh at each session start |
 | File content | **Faithful port, reorganized into labeled, tunable sections** — no behavior change |
 | Templating | **Placeholder tokens in the file** (`{{childName}}` etc.), substituted at session start |
+| Markdown headings | **Stripped before sending** — headings are for human readability; prompt text stays byte-identical to today's |
 | Failure mode | **Fall back to a built-in default** — missing/unreadable file logs a warning and uses the in-code template |
 
 ## File location
@@ -101,11 +102,15 @@ emit `"{{childName}} tends to learn best through {label}; lean into that when it
 helps."`; if the child has no traits yet, it expands to an empty string and the
 line is removed (matching the current `.filter(Boolean)` behavior).
 
-Headings (`##`) and the `# Pip — Study Buddy Behavior` title are sent to Gemini as
-part of the instruction. This is acceptable — markdown headings read as section
-structure and do not change tutoring behavior. The faithful-port test asserts the
-*instruction content* (the sentences and tokens), and notes the headings as the
-one intentional addition over today's plain newline-joined output.
+### Headings are stripped before sending
+
+Headings (`# Pip — Study Buddy Behavior`, `## Persona`, etc.) exist in the file
+**for human readability only**. `renderTemplate` removes markdown heading lines
+(lines whose first non-space character is `#`) before the instruction is sent to
+Gemini. After stripping headings and collapsing the resulting blank lines, the
+prompt text is **byte-identical** to today's newline-joined output. This makes the
+file-vs-prompt distinction explicit: you read structure, Pip reads the same plain
+instruction it gets today.
 
 ## Code changes
 
@@ -122,9 +127,11 @@ changes by one keyword.
   `BUILTIN_TEMPLATE`. Reading fresh every session is intentional and cheap (a few
   KB once per session start).
 - **`renderTemplate(tpl: string, values: Record<string, string>): string`** —
-  replaces each `{{token}}` with its value. Unknown/misspelled tokens are left
-  literal (per the chosen fall-back-not-strict failure mode). After substitution,
-  collapse blank lines left by an empty `{{traitLean}}` so output stays clean.
+  replaces each `{{token}}` with its value, strips markdown heading lines (first
+  non-space char `#`), and collapses the blank lines left by stripped headings and
+  an empty `{{traitLean}}`. Unknown/misspelled tokens are left literal (per the
+  chosen fall-back-not-strict failure mode). The result is plain newline-joined
+  instruction text, byte-identical to today's output for the built-in template.
 - **`buildSystemInstruction(input): Promise<string>`** — computes derived values
   (subject display name, `traitLean`), loads the template, renders it, trims. Now
   `async`. `relay.ts:76` already does `const systemInstruction = await
@@ -147,8 +154,10 @@ stray token in the transcript/behavior and fixes the file.
 `apps/server` unit tests (run via `cd apps/server && bun test`):
 
 1. **Faithful-port test** — `buildSystemInstruction` over a known input (with
-   traits) produces the expected instruction: all original sentences present, all
-   tokens resolved, in the documented order. Locks in "behavior unchanged."
+   traits), rendering the built-in template, produces output **exactly equal** to
+   the previous hardcoded `buildSystemInstruction` result (headings stripped, all
+   tokens resolved, documented order). Locks in "behavior unchanged" by byte
+   equality, not just content presence.
 2. **Token substitution test** — all five tokens resolve from a sample input;
    `{{traitLean}}` is non-empty with traits and the line is absent with no traits.
 3. **Unknown-token passthrough test** — `renderTemplate` leaves an unrecognized
