@@ -1,9 +1,10 @@
 import { betterAuth } from 'better-auth';
 import type { User } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import * as schema from '../db/schema';
-import { guardians } from '../db/schema';
+import { guardians, subscriptions } from '../db/schema';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -37,16 +38,28 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (createdUser) => {
-          // Mint the domain guardian row on first sign-in (idempotent on userId).
-          // Re-throw on failure (the default) so the sign-in aborts rather than
-          // leaving a user with no guardian row — but log it first for diagnosis.
+          const trialDays = Number(process.env.BILLING_TRIAL_DAYS ?? '14');
+          if (!Number.isFinite(trialDays) || trialDays <= 0) {
+            throw new Error(`BILLING_TRIAL_DAYS must be a positive number (got "${process.env.BILLING_TRIAL_DAYS}")`);
+          }
           try {
             await db
               .insert(guardians)
               .values({ userId: createdUser.id, email: createdUser.email, name: createdUser.name })
               .onConflictDoNothing({ target: guardians.userId });
+            const [g] = await db
+              .select({ id: guardians.id })
+              .from(guardians)
+              .where(eq(guardians.userId, createdUser.id))
+              .limit(1);
+            if (g) {
+              await db
+                .insert(subscriptions)
+                .values({ guardianId: g.id, trialEndsAt: new Date(Date.now() + trialDays * 86_400_000) })
+                .onConflictDoNothing({ target: subscriptions.guardianId });
+            }
           } catch (err) {
-            console.error('[auth] guardian create hook failed for user', createdUser.id, err);
+            console.error('[auth] guardian/subscription create hook failed for user', createdUser.id, err);
             throw err;
           }
         },
