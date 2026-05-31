@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { signOut } from '../../auth/authClient';
 import { useQuery } from '@tanstack/react-query';
 import { Pip } from '../../components/Pip';
 import { Button } from '../../components/ui/Button';
@@ -143,6 +144,19 @@ export function DashboardRoute() {
             <div className="font-bold text-[11px] text-ink-3">{gradeLabel}</div>
           </div>
         </div>
+
+        {/* Sign out */}
+        <Button
+          kind="ghost"
+          size="sm"
+          onClick={async () => {
+            await signOut();
+            window.location.assign('/login');
+          }}
+          style={{ marginTop: 8 }}
+        >
+          Sign out
+        </Button>
       </aside>
 
       {/* ── Main ────────────────────────────────────────────────── */}

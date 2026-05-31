@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Pip } from '../../components/Pip';
+import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { StyleBadge } from '../../components/ui/StyleBadge';
@@ -103,6 +105,7 @@ function ToggleRow({ label, sub, initial, accent, last }: {
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function ProfileRoute() {
+  const navigate = useNavigate();
   const { pipColor, pipColorValue, setPipColor } = usePipColor();
   const childId = useActiveChildId();
 
@@ -147,7 +150,12 @@ export function ProfileRoute() {
 
       {/* Header */}
       <div style={{ padding: '14px 20px 6px' }}>
-        <div className="font-display font-extrabold text-[26px] text-ink">{student.name}</div>
+        <div className="flex items-center justify-between">
+          <div className="font-display font-extrabold text-[26px] text-ink">{student.name}</div>
+          <Button kind="ghost" size="sm" onClick={() => navigate('/switch')}>
+            Switch profile
+          </Button>
+        </div>
         <div className="font-body font-semibold text-[13px] text-ink-3">{formatStudentSubtitle(student)}</div>
       </div>
 
