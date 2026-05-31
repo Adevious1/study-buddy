@@ -80,6 +80,42 @@ While signed in as the seed guardian, with the browser's session cookie:
 - `RequireDashboardPin` now throws on a non-ok `/me/dashboard-unlocked` response so a 401
   there redirects to `/login` rather than silently showing the PIN gate.
 
+## Last verified (2026-05-31, dev path, via Playwright)
+
+Driven against the live Docker stack signed in as the dev seed guardian. Every
+result below was read from a real page snapshot or a direct `fetch` to the same
+endpoints the UI uses (not assumed).
+
+| Check | Result |
+|---|---|
+| Authenticated baseline (`GET /api/me`) | ✅ 200, `parent@studybuddy.dev`, child Maya |
+| IDOR — own child (`GET /api/children/:own`) | ✅ 200 |
+| IDOR — valid-but-unowned UUID | ✅ 404 `child_not_found` (no existence leak) |
+| IDOR — malformed id | ✅ 400 |
+| IDOR — no cookie (`credentials:'omit'`) | ✅ 401 |
+| Profile picker `/switch` | ✅ "Who's learning?", Maya card + add (+) |
+| Add-child write path | ✅ birth date required (empty → no submit); valid submit created the child, persisted to DB + `/api/me` |
+| New child becomes active | ✅ `/app` switched to the new child (0 streak, "Nothing scheduled") |
+| Invalid active child (deleted child still selected) | ✅ `/app` bounces to `/switch`; picking a valid child restores `/app` |
+| PIN — 5 wrong attempts | ✅ 401 `pin_incorrect` each |
+| PIN — 6th attempt | ✅ 429 `pin_locked` |
+| PIN — correct PIN *while locked* | ✅ 429 (lockout overrides a correct PIN) |
+| PIN — lockout self-clears | ✅ correct PIN → 204 after ~55s (in-memory window) |
+| Correct PIN (unlocked) | ✅ 204 → dashboard renders |
+| Sign out (sidebar) | ✅ → `/login`, `GET /api/me` → 401 |
+| Re-gate after sign-out | ✅ `/app` → `/login`, `/dashboard` → `/login` |
+| Google OAuth button wired | ✅ hits real Google OAuth; dev placeholder creds → "invalid_client" (full leg needs real creds) |
+| Re-login (dev path) | ✅ back to `/app` as the seed guardian |
+
+**Not covered:** the full **Google OAuth** completion (needs real `GOOGLE_CLIENT_ID`/
+`SECRET`) and the brand-new-guardian **onboarding** flow (PIN-set → add first child),
+which requires a fresh guardian — the dev seed guardian already has a PIN + child.
+
+> Driver note: Playwright renumbers element refs on every navigation, so snapshot
+> **immediately before each click** and use that snapshot's ref (or drive by
+> role/text). Reusing a ref across a navigation can resolve to a different element
+> (e.g. an SVG path or the floating "Open dashboard ↗" overlay).
+
 ## Automated coverage (run anytime)
 
 Server suite (host, throwaway Postgres on 5433 — drop the test DB first to force a fresh
