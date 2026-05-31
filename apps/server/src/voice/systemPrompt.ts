@@ -8,6 +8,8 @@ export interface SystemPromptInput {
   subjectKind: SubjectKind;
   topic: string;
   traits: LearningStyleTrait[];
+  /** True only on the child's very first session ever; gates Pip's self-intro. */
+  firstSession: boolean;
 }
 
 const SUBJECT_NAME: Record<SubjectKind, string> = {
@@ -88,6 +90,18 @@ function traitLean(input: SystemPromptInput): string {
     : '';
 }
 
+/**
+ * The `{{intro}}` value. On a child's first-ever session, Pip introduces itself
+ * once. On every later session the child already knows Pip, so we explicitly
+ * suppress the re-introduction (an explicit "do not" suppresses it far more
+ * reliably than silence).
+ */
+function intro(input: SystemPromptInput): string {
+  return input.firstSession
+    ? `This is the very first time you are meeting ${input.childName}. Say a brief, warm hello and introduce yourself as Pip — just this once.`
+    : `${input.childName} already knows you as Pip. Do NOT introduce yourself or say "I'm Pip" again — just greet them warmly by name and get started.`;
+}
+
 export async function buildSystemInstruction(input: SystemPromptInput): Promise<string> {
   const tpl = await loadTemplate();
   return renderTemplate(tpl, {
@@ -96,5 +110,6 @@ export async function buildSystemInstruction(input: SystemPromptInput): Promise<
     subject: SUBJECT_NAME[input.subjectKind],
     topic: input.topic,
     traitLean: traitLean(input),
+    intro: intro(input),
   });
 }

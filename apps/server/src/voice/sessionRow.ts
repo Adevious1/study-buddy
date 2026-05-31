@@ -1,9 +1,22 @@
-import { eq } from 'drizzle-orm';
+import { eq, count } from 'drizzle-orm';
 import { db } from '../db/client';
 import { sessions } from '../db/schema';
 import type { SubjectKind } from '@study-buddy/shared';
 
 export type FinalState = 'completed' | 'abandoned';
+
+/**
+ * How many tutoring sessions this child already has. Zero means this is their
+ * very first session, which gates Pip's one-time self-introduction. Call this
+ * BEFORE createLiveSession inserts the new row.
+ */
+export async function countSessionsForChild(childId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(sessions)
+    .where(eq(sessions.childId, childId));
+  return row?.n ?? 0;
+}
 
 /** Insert an in_progress session row for a live voice session; returns its id. */
 export async function createLiveSession(

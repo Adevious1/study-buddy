@@ -4,8 +4,9 @@ import { children, learningProfiles, learningProfileTraits } from '../db/schema'
 import type { ClientControl, ServerControl, SubjectKind } from '@study-buddy/shared';
 import { buildSystemInstruction } from './systemPrompt';
 import { SignalAccumulator } from './tools';
-import { createLiveSession, finalizeLiveSession } from './sessionRow';
+import { createLiveSession, finalizeLiveSession, countSessionsForChild } from './sessionRow';
 import { commitLearningProfile } from './profileCommit';
+import { stripTextArtifact } from './transcript';
 import type { GeminiConnector, GeminiLiveSession, GeminiEvents } from './geminiSession';
 
 export interface RelaySink {
@@ -33,6 +34,9 @@ export function createRelay(opts: RelayOptions) {
   let sessionRowId: string | null = null;
   let resumptionHandle: string | undefined;
   let capTimer: ReturnType<typeof setTimeout> | null = null;
+  // True while a Pip turn is mid-stream (deltas still arriving); the leading
+  // "Text " artifact is only stripped on the first delta of each turn.
+  let pipTurnOpen = false;
 
   async function buildPrompt(subjectKind: SubjectKind, topic: string): Promise<string> {
     const [child] = await db.select().from(children).where(eq(children.id, childId)).limit(1);
@@ -44,10 +48,14 @@ export function createRelay(opts: RelayOptions) {
           .select({ traitId: learningProfileTraits.traitId, label: learningProfileTraits.label, score: learningProfileTraits.score })
           .from(learningProfileTraits).where(eq(learningProfileTraits.profileId, profile.id))
       : [];
+    // Count existing sessions BEFORE createLiveSession inserts this one, so a
+    // brand-new child (zero rows) gets Pip's one-time self-introduction.
+    const priorSessions = await countSessionsForChild(childId);
     return await buildSystemInstruction({
       childName: child?.name ?? 'friend',
       grade: child?.grade ?? 3,
       subjectKind, topic,
+      firstSession: priorSessions === 0,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       traits: traits as any,
     });
@@ -57,8 +65,20 @@ export function createRelay(opts: RelayOptions) {
     return {
       onAudio: (pcm) => sink.sendBinary(pcm),
       onInputTranscript: (text, final) => sink.sendControl({ type: 'transcript', role: 'child', text, final }),
-      onOutputTranscript: (text, final) => sink.sendControl({ type: 'transcript', role: 'pip', text, final }),
-      onInterrupted: () => sink.sendControl({ type: 'interrupted' }),
+      onOutputTranscript: (text, final) => {
+        // Gemini's native-audio output transcription occasionally prefixes a
+        // stray "Text " token at the very start of a turn. Strip it only on the
+        // first delta of each Pip turn so a legitimate later "Text" is untouched.
+        const clean = pipTurnOpen ? text : stripTextArtifact(text);
+        pipTurnOpen = !final;
+        sink.sendControl({ type: 'transcript', role: 'pip', text: clean, final });
+      },
+      onInterrupted: () => {
+        // An interrupt cuts off Pip's turn; the next output is a fresh turn,
+        // so re-arm the leading-"Text " strip for its first delta.
+        pipTurnOpen = false;
+        sink.sendControl({ type: 'interrupted' });
+      },
       onToolCall: (id, name, args) => {
         if (name === 'note_learning_signal') signals.addRaw(args);
         session?.ackTool(id, name);

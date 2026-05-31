@@ -37,6 +37,7 @@ const inputWithTrait: SystemPromptInput = {
   grade: 3,
   subjectKind: 'math',
   topic: 'Fractions',
+  firstSession: false,
   traits: [
     { traitId: 'kinesthetic', label: 'Hands-on', score: 2 },
     { traitId: 'visual', label: 'Pictures', score: 5 },
@@ -48,6 +49,7 @@ const inputNoTrait: SystemPromptInput = {
   grade: 3,
   subjectKind: 'math',
   topic: 'Fractions',
+  firstSession: false,
   traits: [],
 };
 
@@ -113,6 +115,36 @@ describe('BUILTIN_TEMPLATE', () => {
     for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{traitLean}}']) {
       expect(BUILTIN_TEMPLATE).toContain(t);
     }
+  });
+});
+
+describe('intro token (first-session gating)', () => {
+  // Render a tiny template that is just the {{intro}} token, isolating the
+  // intro behavior from the rest of the prompt.
+  async function renderIntro(firstSession: boolean): Promise<string> {
+    const p = join(tmpdir(), `sb-intro-${process.pid}.md`);
+    await writeFile(p, '{{intro}}', 'utf8');
+    const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
+    process.env.STUDY_BUDDY_PROMPT_PATH = p;
+    try {
+      return await buildSystemInstruction({ ...inputNoTrait, firstSession });
+    } finally {
+      if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
+      else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
+      await rm(p, { force: true });
+    }
+  }
+
+  it('introduces Pip on the first session', async () => {
+    const out = await renderIntro(true);
+    expect(out).toContain('first time');
+    expect(out).toContain('introduce yourself as Pip');
+  });
+
+  it('suppresses the self-intro on later sessions', async () => {
+    const out = await renderIntro(false);
+    expect(out).toContain('already knows you as Pip');
+    expect(out).toContain('Do NOT introduce yourself');
   });
 });
 
