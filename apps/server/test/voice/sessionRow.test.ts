@@ -33,4 +33,42 @@ describe('sessionRow', () => {
     const row = await mod.getSessionById(id);
     expect(row.state).toBe('abandoned');
   });
+
+  it('persists transcript + recap columns when finalizing completed', async () => {
+    const id = await mod.createLiveSession(VOICE_TEST_CHILD_ID, 'math', 'Adding');
+    await mod.finalizeLiveSession(id, 'completed', {
+      transcript: [
+        { role: 'pip', text: 'What is 2 plus 3?' },
+        { role: 'child', text: 'Five!' },
+      ],
+      recap: {
+        starsEarned: 3, starsMax: 3, solvedSelf: 1, solvedTotal: 1,
+        figuredOut: [{ ok: true, text: 'You added 2 and 3' }],
+        insightTitle: 'Quick adder', insightBody: 'Fast work.', insightBadge: 'QUICK',
+      },
+    });
+
+    const row = await mod.getSessionById(id);
+    expect(row.state).toBe('completed');
+    expect(row.starsEarned).toBe(3);
+    expect(row.starsMax).toBe(3);
+    expect(row.solvedSelf).toBe(1);
+    expect(row.figuredOut).toEqual([{ ok: true, text: 'You added 2 and 3' }]);
+    expect(row.insightBadge).toBe('QUICK');
+    expect(row.transcript).toEqual([
+      { role: 'pip', text: 'What is 2 plus 3?' },
+      { role: 'child', text: 'Five!' },
+    ]);
+  });
+
+  it('persists transcript only (no recap) when finalizing abandoned', async () => {
+    const id = await mod.createLiveSession(VOICE_TEST_CHILD_ID, 'reading', 'A book');
+    await mod.finalizeLiveSession(id, 'abandoned', {
+      transcript: [{ role: 'child', text: 'bye' }],
+    });
+    const row = await mod.getSessionById(id);
+    expect(row.state).toBe('abandoned');
+    expect(row.transcript).toEqual([{ role: 'child', text: 'bye' }]);
+    expect(row.starsEarned).toBeNull();
+  });
 });
