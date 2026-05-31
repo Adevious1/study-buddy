@@ -6,10 +6,11 @@ import { Button } from '../../components/ui/Button';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Star, Sparkle } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
-import { repository, CURRENT_CHILD_ID } from '../../data';
+import { repository } from '../../data';
 import { formatMinutes } from '../../format';
 import { subjectLabel } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
+import { useActiveChildId } from '../../state/ChildProfileContext';
 
 // Inline confetti dot positions / colors from the reference
 const CONFETTI = [
@@ -24,13 +25,14 @@ const CONFETTI = [
 export function RecapRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
+  const childId = useActiveChildId();
 
   const recapQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'recap'],
+    queryKey: ['child', childId, 'recap'],
     queryFn: () => repository.getRecap(),
   });
   const studentQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'student'],
+    queryKey: ['child', childId, 'student'],
     queryFn: () => repository.getStudent(),
   });
 

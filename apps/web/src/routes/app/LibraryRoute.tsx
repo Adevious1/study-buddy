@@ -4,16 +4,18 @@ import { Pip } from '../../components/Pip';
 import { Card } from '../../components/ui/Card';
 import { SubjectIcon } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
-import { repository, CURRENT_CHILD_ID } from '../../data';
+import { repository } from '../../data';
 import { subjectLabel, subjectTheme } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
+import { useActiveChildId } from '../../state/ChildProfileContext';
 
 export function LibraryRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
+  const childId = useActiveChildId();
 
   const subjectsQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'subjects'],
+    queryKey: ['child', childId, 'subjects'],
     queryFn: () => repository.getSubjects(),
   });
 

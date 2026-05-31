@@ -6,31 +6,33 @@ import { Card } from '../../components/ui/Card';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Flame, Sparkle, SubjectIcon } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
-import { repository, CURRENT_CHILD_ID } from '../../data';
+import { repository } from '../../data';
 import { formatDuration, formatDelta, formatProgressLabel } from '../../format';
 import { subjectLabel, subjectTheme } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
+import { useActiveChildId } from '../../state/ChildProfileContext';
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 export function DashboardRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
+  const childId = useActiveChildId();
 
   const studentQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'student'],
+    queryKey: ['child', childId, 'student'],
     queryFn: () => repository.getStudent(),
   });
   const continueQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'continueSession'],
+    queryKey: ['child', childId, 'continueSession'],
     queryFn: () => repository.getContinueSession(),
   });
   const weekActivityQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'weekActivity'],
+    queryKey: ['child', childId, 'weekActivity'],
     queryFn: () => repository.getWeekActivity(),
   });
   const assignmentsQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'assignments'],
+    queryKey: ['child', childId, 'assignments'],
     queryFn: () => repository.getTodayAssignments(),
   });
 

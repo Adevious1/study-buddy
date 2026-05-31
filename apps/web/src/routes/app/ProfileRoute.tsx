@@ -7,10 +7,11 @@ import { StyleBadge } from '../../components/ui/StyleBadge';
 import { Toggle } from '../../components/ui/Toggle';
 import { Flame } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
-import { repository, CURRENT_CHILD_ID } from '../../data';
+import { repository } from '../../data';
 import { formatStudentSubtitle } from '../../format';
 import { traitColor } from '../../theme/subjectTheme';
 import { usePipColor, PIP_COLOR_VALUE } from '../../state/PipColorContext';
+import { useActiveChildId } from '../../state/ChildProfileContext';
 import type { PipColor } from '@study-buddy/shared';
 
 const PIP_COLORS = Object.keys(PIP_COLOR_VALUE) as PipColor[];
@@ -103,17 +104,18 @@ function ToggleRow({ label, sub, initial, accent, last }: {
 
 export function ProfileRoute() {
   const { pipColor, pipColorValue, setPipColor } = usePipColor();
+  const childId = useActiveChildId();
 
   const studentQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'student'],
+    queryKey: ['child', childId, 'student'],
     queryFn: () => repository.getStudent(),
   });
   const profileQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'learningProfile'],
+    queryKey: ['child', childId, 'learningProfile'],
     queryFn: () => repository.getLearningProfile(),
   });
   const weekQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'weekActivity'],
+    queryKey: ['child', childId, 'weekActivity'],
     queryFn: () => repository.getWeekActivity(),
   });
 

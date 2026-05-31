@@ -7,24 +7,26 @@ import { Button } from '../../components/ui/Button';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Flame, Star } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
-import { repository, CURRENT_CHILD_ID } from '../../data';
+import { repository } from '../../data';
 import { formatProgressLabel } from '../../format';
 import { usePipColor } from '../../state/PipColorContext';
+import { useActiveChildId } from '../../state/ChildProfileContext';
 
 export function HomeRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
+  const childId = useActiveChildId();
 
   const studentQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'student'],
+    queryKey: ['child', childId, 'student'],
     queryFn: () => repository.getStudent(),
   });
   const continueQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'continueSession'],
+    queryKey: ['child', childId, 'continueSession'],
     queryFn: () => repository.getContinueSession(),
   });
   const assignmentsQ = useQuery({
-    queryKey: ['child', CURRENT_CHILD_ID, 'assignments'],
+    queryKey: ['child', childId, 'assignments'],
     queryFn: () => repository.getTodayAssignments(),
   });
 

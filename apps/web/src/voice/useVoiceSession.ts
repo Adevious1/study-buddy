@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { ClientControl, ServerControl, SubjectKind } from '@study-buddy/shared';
-import { CURRENT_CHILD_ID } from '../data';
+import { useActiveChild } from '../state/ChildProfileContext';
 import { voiceReducer, initialVoiceState } from './voiceReducer';
 import { startCapture, type Capture } from './audioCapture';
 import { AudioPlayer } from './audioPlayback';
@@ -18,6 +18,7 @@ function wsUrl(childId: string): string {
 
 export function useVoiceSession() {
   const [state, dispatch] = useReducer(voiceReducer, initialVoiceState);
+  const { activeChildId } = useActiveChild();
   const wsRef = useRef<WebSocket | null>(null);
   const captureRef = useRef<Capture | null>(null);
   const playerRef = useRef<AudioPlayer | null>(null);
@@ -38,6 +39,10 @@ export function useVoiceSession() {
   }, []);
 
   const start = useCallback(async (args: StartArgs) => {
+    // No active child → nothing to connect to. The voice screen is gated behind a
+    // selected profile, so this is defensive: it avoids opening a malformed
+    // /api/children//voice socket if start() is ever called without one.
+    if (!activeChildId) return;
     dispatch({ kind: 'connecting' });
     let player: AudioPlayer;
     try {
@@ -48,7 +53,7 @@ export function useVoiceSession() {
       return;
     }
 
-    const ws = new WebSocket(wsUrl(CURRENT_CHILD_ID));
+    const ws = new WebSocket(wsUrl(activeChildId));
     ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
     // Only react to events from the socket that is still the current one. Under
@@ -84,7 +89,7 @@ export function useVoiceSession() {
     ws.onclose = () => {
       if (isCurrent()) dispatch({ kind: 'server', msg: { type: 'status', state: 'ended' } });
     };
-  }, []);
+  }, [activeChildId]);
 
   const end = useCallback(() => {
     // Send the graceful end first (WS preserves frame order, so the relay
