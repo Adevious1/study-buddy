@@ -40,8 +40,9 @@ can pay. Seat quantity = child count, synced to Stripe on add. No better-auth
 version change. Accepted limitations (webhook event ordering/dedup; seat-sync
 partial state) are documented in the smoke doc.
 
-The live audio loop, the auth flow, and the billing flow all require a browser
-(and, for Google/Stripe, real creds); none is smoke-tested in CI. See
+The screens, the live audio loop, the auth flow, and the billing flow all require
+a browser (and, for Google/Stripe, real creds); none is smoke-tested in CI. See
+`docs/superpowers/SP1-manual-smoke.md` (the six screens + dashboard),
 `docs/superpowers/SP3-manual-smoke.md`, `docs/superpowers/SP4-manual-smoke.md`,
 and `docs/superpowers/SP5-manual-smoke.md`. Dev seed login:
 `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
