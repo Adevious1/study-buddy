@@ -44,7 +44,9 @@ The screens, the live audio loop, the auth flow, and the billing flow all requir
 a browser (and, for Google/Stripe, real creds); none is smoke-tested in CI. See
 `docs/superpowers/SP1-manual-smoke.md` (the six screens + dashboard),
 `docs/superpowers/SP3-manual-smoke.md`, `docs/superpowers/SP4-manual-smoke.md`,
-and `docs/superpowers/SP5-manual-smoke.md`. Dev seed login:
+and `docs/superpowers/SP5-manual-smoke.md`. The backend/DB infra smoke (health,
+schema, migrations, seed, API auth-gating — `curl` + `psql`, not a browser) is
+`docs/superpowers/SP2-manual-smoke.md`. Dev seed login:
 `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
 **Deferred to a later effort:** auto-generated session recap, transcript
