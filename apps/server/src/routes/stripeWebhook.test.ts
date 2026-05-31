@@ -1,0 +1,53 @@
+import { describe, it, expect, beforeAll } from 'bun:test';
+import { ensureTestDb, setDatabaseUrl, migrateAndSeedTestDb } from '../../test/setup';
+import { eq } from 'drizzle-orm';
+import Stripe from 'stripe';
+import { app } from '../index';
+import { db } from '../db/client';
+import { subscriptions } from '../db/schema';
+import { makeGuardian } from '../../test/authHarness';
+
+const SECRET = 'whsec_test_secret';
+
+async function signed(payload: object): Promise<{ body: string; sig: string }> {
+  const body = JSON.stringify(payload);
+  const sig = await Stripe.webhooks.generateTestHeaderStringAsync({ payload: body, secret: SECRET });
+  return { body, sig };
+}
+
+describe('stripe webhook', () => {
+  beforeAll(async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = SECRET;
+    process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? 'sk_test_dummy';
+    await ensureTestDb();
+    setDatabaseUrl();
+    await migrateAndSeedTestDb();
+  });
+
+  it('400 on a bad signature', async () => {
+    const res = await app.request('/api/stripe/webhook', {
+      method: 'POST', headers: { 'stripe-signature': 'bad' }, body: '{}',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('subscription.updated transitions the row to active with seats/subId', async () => {
+    const ts = Date.now();
+    const cusId = `cus_wh_${ts}`;
+    const subId = `sub_wh_${ts}`;
+    const { guardianId } = await makeGuardian(`wh-${ts}@test.dev`);
+    await db.update(subscriptions).set({ stripeCustomerId: cusId }).where(eq(subscriptions.guardianId, guardianId));
+
+    const { body, sig } = await signed({
+      type: 'customer.subscription.updated',
+      data: { object: { id: subId, customer: cusId, status: 'active', items: { data: [{ quantity: 3 }] }, current_period_end: 1900000000 } },
+    });
+    const res = await app.request('/api/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': sig }, body });
+    expect(res.status).toBe(200);
+
+    const [row] = await db.select().from(subscriptions).where(eq(subscriptions.guardianId, guardianId)).limit(1);
+    expect(row.stripeSubscriptionId).toBe(subId);
+    expect(row.status).toBe('active');
+    expect(row.seats).toBe(3);
+  });
+});

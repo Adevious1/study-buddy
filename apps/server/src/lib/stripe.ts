@@ -61,8 +61,8 @@ export async function setSubscriptionQuantity(subscriptionId: string, quantity: 
   });
 }
 
-export function constructWebhookEvent(rawBody: string, signature: string): Stripe.Event {
+export async function constructWebhookEvent(rawBody: string, signature: string): Promise<Stripe.Event> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret) throw new Error('STRIPE_WEBHOOK_SECRET is required');
-  return stripeClient().webhooks.constructEvent(rawBody, signature, secret);
+  return stripeClient().webhooks.constructEventAsync(rawBody, signature, secret);
 }
