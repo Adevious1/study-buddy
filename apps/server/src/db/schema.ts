@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  pgTable, uuid, text, integer, date, timestamp, jsonb, check, uniqueIndex, index,
+  pgTable, uuid, text, integer, date, timestamp, jsonb, check, uniqueIndex, index, boolean,
 } from 'drizzle-orm/pg-core';
 
 const timestamps = {
@@ -8,10 +8,65 @@ const timestamps = {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 };
 
+// --- better-auth-owned tables (user / session / account / verification) ---
+// Shape is dictated by better-auth's Drizzle adapter; do not hand-edit columns.
+// They deliberately inline created_at/updated_at instead of spreading the shared
+// `timestamps` helper, so a future change to that helper can't silently drift
+// these tables out of the shape better-auth expects.
+// NOTE: `session` (singular) is the better-auth auth-session table — distinct
+// from the domain `sessions` (plural) Pip tutoring table defined below.
+export const user = pgTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  image: text('image'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const session = pgTable('session', {
+  id: text('id').primaryKey(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  token: text('token').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+});
+
+export const account = pgTable('account', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const verification = pgTable('verification', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const guardians = pgTable('guardians', {
   id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').unique().references(() => user.id, { onDelete: 'cascade' }),
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
+  pinHash: text('pin_hash'),
   ...timestamps,
 });
 
@@ -64,6 +119,7 @@ export const assignments = pgTable(
   }),
 );
 
+// Domain `sessions` (plural) — Pip tutoring sessions. Not better-auth's `session`.
 export const sessions = pgTable(
   'sessions',
   {
