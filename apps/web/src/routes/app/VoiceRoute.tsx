@@ -143,11 +143,11 @@ export function VoiceRoute() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [state.turns]);
 
-  // Return Home only when a session that truly went live ends cleanly. A session
-  // that ends without ever connecting — React StrictMode's dev double-mount, a
-  // failed connect, or a mic denial — must NOT bounce; let the error state show.
+  // When a session that truly went live ends cleanly, the recap is now written —
+  // take the child to it. A session that never connected returns Home instead.
   useEffect(() => {
-    if (state.status === 'ended' && wentLiveRef.current && !state.error) navigate('/app');
+    if (state.status !== 'ended' || state.error) return;
+    navigate(wentLiveRef.current ? '/app/recap' : '/app');
   }, [state.status, state.error, navigate]);
 
   const accent = 'var(--color-coral)';
@@ -184,6 +184,25 @@ export function VoiceRoute() {
           ))}
         </div>
       </div>
+    );
+  }
+
+  if (state.status === 'ending') {
+    // Only a session that truly went live has a recap being written. A cancel
+    // during "Connecting…" ends quickly and routes Home, so show a quiet
+    // placeholder rather than a misleading "writing your recap" for that case.
+    return wentLiveRef.current ? (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-bg px-8 text-center">
+        <Pip size={120} state="think" color={pipColorValue} expression="happy" />
+        <div className="font-display font-extrabold text-[22px] text-ink">
+          Putting together what you learned…
+        </div>
+        <div className="font-body font-semibold text-[14px] text-ink-2">
+          Pip is writing your recap. One moment!
+        </div>
+      </div>
+    ) : (
+      <div className="flex-1 bg-bg" />
     );
   }
 

@@ -1,7 +1,8 @@
 import { eq, count } from 'drizzle-orm';
 import { db } from '../db/client';
 import { sessions } from '../db/schema';
-import type { SubjectKind } from '@study-buddy/shared';
+import type { SubjectKind, TranscriptTurn } from '@study-buddy/shared';
+import type { RecapContent } from '../recap/recapContent';
 
 export type FinalState = 'completed' | 'abandoned';
 
@@ -31,11 +32,36 @@ export async function createLiveSession(
   return row.id;
 }
 
-/** Mark a live session completed/abandoned and stamp endedAt. */
-export async function finalizeLiveSession(id: string, state: FinalState): Promise<void> {
+export interface FinalizeExtra {
+  transcript?: TranscriptTurn[];
+  recap?: RecapContent;
+}
+
+/** Mark a live session completed/abandoned, stamp endedAt, and persist transcript + recap. */
+export async function finalizeLiveSession(
+  id: string,
+  state: FinalState,
+  extra: FinalizeExtra = {},
+): Promise<void> {
   await db
     .update(sessions)
-    .set({ state, endedAt: new Date() })
+    .set({
+      state,
+      endedAt: new Date(),
+      ...(extra.transcript ? { transcript: extra.transcript } : {}),
+      ...(extra.recap
+        ? {
+            starsEarned: extra.recap.starsEarned,
+            starsMax: extra.recap.starsMax,
+            solvedSelf: extra.recap.solvedSelf,
+            solvedTotal: extra.recap.solvedTotal,
+            figuredOut: extra.recap.figuredOut,
+            insightTitle: extra.recap.insightTitle,
+            insightBody: extra.recap.insightBody,
+            insightBadge: extra.recap.insightBadge,
+          }
+        : {}),
+    })
     .where(eq(sessions.id, id));
 }
 

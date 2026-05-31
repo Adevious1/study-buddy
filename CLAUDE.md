@@ -10,9 +10,10 @@ The design spec lives in `docs/superpowers/specs/`.
 
 ## Status
 
-**SP1 (UI), SP2 (backend + database), SP3 (live voice tutor), SP4 (auth), and
-SP5 (billing) are all done. SP1–SP4 are merged to `main`; SP5 is on the
-`sp5-billing` branch.**
+**SP1 (UI), SP2 (backend + database), SP3 (live voice tutor), SP4 (auth),
+SP5 (billing), and SP6 (session recap) are all done. SP1–SP4 are merged to
+`main`; SP5 is on the `sp5-billing` branch; SP6 is on the `sp6-session-recap`
+branch.**
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -58,6 +59,25 @@ can pay. Seat quantity = child count, synced to Stripe on add. No better-auth
 version change. Accepted limitations (webhook event ordering/dedup; seat-sync
 partial state) are documented in the smoke doc.
 
+SP6 (session recap): at the end of a completed voice session, the server persists
+the full transcript into a new `sessions.transcript` jsonb column (delivering the
+previously-deferred transcript-persistence item), then makes one non-streaming
+Gemini call (`gemini-3-flash-preview`) to summarize the transcript into the
+existing recap columns (`stars_earned`/`stars_max`, `solved_self`/`solved_total`,
+`figured_out`, `insight_title`/`insight_body`/`insight_badge`), then emits `ended`. The client shows a "Putting together what you learned…"
+wrapping-up screen and navigates to the already-built `/app/recap` once the server
+confirms (generate-then-reveal UX, gated on a went-live session). Generation is
+timeout-bounded with a graceful fallback recap (1 star, encouraging copy) so the
+screen never breaks. Abandoned sessions persist the transcript but generate no
+recap. The summarizer prompt is externalized in
+**`apps/server/study-buddy-recap.md`** — hot-reloaded from the bind mount, with a
+byte-identical in-code `BUILTIN_RECAP_TEMPLATE` as the fallback and a drift-guard
+test, exactly mirroring the `study-buddy.md` / `BUILTIN_TEMPLATE` pattern from
+SP3. Key server files: `apps/server/src/recap/` (summarizer, prompt loader,
+fallback), `apps/server/src/voice/transcript.ts` (`TranscriptAccumulator`),
+`finalizeLiveSession`, and relay `finish()`; client changes span `VoiceRoute`,
+`useVoiceSession`, and `voiceReducer`.
+
 The screens, the live audio loop, the auth flow, and the billing flow all require
 a browser (and, for Google/Stripe, real creds); none is smoke-tested in CI. Each
 subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-05-31:
@@ -80,14 +100,14 @@ subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-05
 - `SP5-manual-smoke.md` (billing) — 🟡 **partial**: trial/banner/gates (402 + client
   `/app`→`/subscribe`) verified; the live Stripe Checkout/Portal payment flow is
   tabled (needs Stripe test creds + the Stripe CLI — see [[sp5-stripe-live-smoke-pending]]).
+- `SP6-manual-smoke.md` (live recap loop) — 🟡 **pending** a human mic run.
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
-**Deferred to a later effort:** auto-generated session recap, transcript
-persistence, LLM-written profile notes, interactive hint chips, true subjectless
-free-talk, and transparent mid-session reconnect across Gemini's ~10-min
-connection reset (the soft-cap + abandoned-on-disconnect paths ARE implemented;
-the seamless resumption reconnect is the remaining seam).
+**Deferred to a later effort:** LLM-written profile notes, interactive hint chips,
+true subjectless free-talk, and transparent mid-session reconnect across Gemini's
+~10-min connection reset (the soft-cap + abandoned-on-disconnect paths ARE
+implemented; the seamless resumption reconnect is the remaining seam).
 
 ## Architecture (committed decisions)
 
@@ -130,6 +150,10 @@ implementation cycle. **Do not collapse these into one effort.**
    public signature-verified webhook, entitlement gating (`/app` → `/subscribe`
    client-side; voice + add-child → 402 server-side) with `/dashboard` kept
    reachable to pay; seat quantity synced to child count. (On `sp5-billing`.)
+6. **Session recap** ✓ _done_ — post-session Gemini summary (`gemini-3-flash-preview`)
+   into the existing recap UI; transcript persistence (new `sessions.transcript`
+   jsonb); tunable recap prompt (`study-buddy-recap.md`); generate-then-reveal UX
+   (wrapping-up screen → `/app/recap`). (On `sp6-session-recap`.)
 
 ## Planned layout (pnpm monorepo)
 

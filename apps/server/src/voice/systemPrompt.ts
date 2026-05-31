@@ -1,6 +1,8 @@
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { LearningStyleTrait, SubjectKind } from '@study-buddy/shared';
+import { renderTemplate, loadTemplateFile } from '../lib/promptTemplate';
+
+export { renderTemplate }; // re-exported so existing importers/tests are unaffected
 
 export interface SystemPromptInput {
   childName: string;
@@ -72,32 +74,7 @@ function templatePath(): string {
 
 /** Read study-buddy.md fresh (hot-reload); fall back to the built-in on any error. */
 export async function loadTemplate(): Promise<string> {
-  try {
-    return await readFile(templatePath(), 'utf8');
-  } catch (err) {
-    console.warn(`[systemPrompt] could not read ${templatePath()}; using built-in template`, err);
-    return BUILTIN_TEMPLATE;
-  }
-}
-
-/**
- * Substitute {{tokens}}, strip markdown heading lines, and collapse the blank
- * lines left behind by stripped headings and empty tokens. Unknown tokens are
- * left literal. Output is plain newline-joined instruction text.
- */
-export function renderTemplate(tpl: string, values: Record<string, string>): string {
-  const substituted = tpl.replace(/\{\{(\w+)\}\}/g, (match, key: string) =>
-    key in values ? values[key] : match,
-  );
-  return substituted
-    .split('\n')
-    .map((line) => line.replace(/\s+$/, ''))
-    // Drop ATX markdown headings (1-6 '#' followed by a space). The space
-    // requirement is deliberate: a hand-edited instruction line that happens to
-    // start with '#' (e.g. "#1 rule: ...") is NOT a heading and must survive.
-    .filter((line) => !/^\s*#{1,6}\s/.test(line))
-    .filter((line) => line.length > 0) // drop blank lines
-    .join('\n');
+  return loadTemplateFile(templatePath(), BUILTIN_TEMPLATE);
 }
 
 function traitLean(input: SystemPromptInput): string {

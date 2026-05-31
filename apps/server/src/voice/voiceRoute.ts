@@ -5,9 +5,11 @@ import { type ChildVariables } from '../lib/childContext';
 import { requireEntitled } from '../lib/requireEntitled';
 import { createRelay } from './relay';
 import { makeGeminiConnector } from './geminiSession';
+import { makeGeminiRecapGenerator } from '../recap/generateRecap';
 
 const apiKey = process.env.GEMINI_API_KEY ?? '';
 const connector = makeGeminiConnector(apiKey);
+const recapGenerator = makeGeminiRecapGenerator(apiKey);
 
 export const voiceWebsocket = websocket;
 
@@ -23,6 +25,7 @@ export const voiceRoute = new Hono<{ Variables: ChildVariables }>().get(
         relay = createRelay({
           childId,
           connector,
+          recapGenerator,
           sink: {
             sendControl: (m) => ws.send(JSON.stringify(m)),
             sendBinary: (b) => ws.send(b as Uint8Array<ArrayBuffer>),

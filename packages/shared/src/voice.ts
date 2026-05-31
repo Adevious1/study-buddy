@@ -27,3 +27,9 @@ export interface LearningSignal {
   trait: LearningTraitId;
   strength: LearningSignalStrength;
 }
+
+/** One finalized turn of a session transcript, persisted and fed to the recap summarizer. */
+export interface TranscriptTurn {
+  role: 'pip' | 'child';
+  text: string;
+}

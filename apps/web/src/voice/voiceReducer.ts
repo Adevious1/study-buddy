@@ -8,7 +8,7 @@ export interface Turn {
   final: boolean;
 }
 export interface VoiceState {
-  status: 'idle' | 'connecting' | VoiceStatus;
+  status: 'idle' | 'connecting' | 'ending' | VoiceStatus;
   turns: Turn[];
   error: VoiceErrorCode | null;
 }
@@ -17,10 +17,12 @@ export const initialVoiceState: VoiceState = { status: 'idle', turns: [], error:
 
 export type VoiceAction =
   | { kind: 'server'; msg: ServerControl }
-  | { kind: 'connecting' };
+  | { kind: 'connecting' }
+  | { kind: 'ending' };
 
 export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState {
   if (action.kind === 'connecting') return { ...state, status: 'connecting', error: null };
+  if (action.kind === 'ending') return { ...state, status: 'ending' };
   const msg = action.msg;
   switch (msg.type) {
     case 'ready':

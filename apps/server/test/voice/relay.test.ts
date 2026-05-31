@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 import { ensureTestDb, setDatabaseUrl, migrateAndSeedTestDb } from '../setup';
 import { ensureVoiceTestChild, VOICE_TEST_CHILD_ID } from './fixtures';
 import { makeFakeGemini } from '../../src/voice/fakeGeminiSession';
+import { makeFakeRecapGenerator } from '../../src/recap/fakeRecapGenerator';
 import type { ServerControl } from '@study-buddy/shared';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,5 +85,81 @@ describe('voice relay', () => {
     await fake.events();
     relay.handleAudio(new Uint8Array([9, 9, 9]));
     expect(fake.sent.audio).toHaveLength(1);
+  });
+
+  it('does not go live (and cleans up) if the session ends while still connecting', async () => {
+    // A connector we resolve manually, to interleave end() between connect start and finish.
+    let resolveConnect: ((s: unknown) => void) | null = null;
+    let connectorInvoked!: () => void;
+    // connectorReadyP resolves once start() actually calls connector(), i.e. after
+    // buildPrompt's DB work completes and start() is blocked inside the connector await.
+    const connectorReadyP = new Promise<void>((r) => { connectorInvoked = r; });
+    const fakeSession = {
+      closed: false,
+      sendAudio() {}, sendText() {}, ackTool() {}, audioStreamEnd() {},
+      close: async () => { fakeSession.closed = true; },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const connector = (_opts: any, _events: any) => new Promise((r) => {
+      resolveConnect = r as (s: unknown) => void;
+      connectorInvoked();
+    });
+    const out = sink();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: connector as any, sink: out });
+
+    const startP = relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'X', title: 'X' });
+    // Wait until the connector has been invoked (start() is now inside connector await).
+    await connectorReadyP;
+    // End arrives while start() is still awaiting the connector.
+    await relay.handleControl({ type: 'end' });
+    // Now the connector resolves — start() must detect the ended state and bail.
+    resolveConnect!(fakeSession);
+    await startP;
+
+    expect(out.control.some((m) => m.type === 'ready')).toBe(false);
+    expect(out.control.some((m) => m.type === 'status' && m.state === 'live')).toBe(false);
+    expect(fakeSession.closed).toBe(true);
+  });
+
+  it('accumulates the transcript and persists a recap on completed end', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const recapGen = makeFakeRecapGenerator({
+      figuredOut: [{ ok: true, text: 'You added 12 apples' }],
+      solvedSelf: 1, solvedTotal: 2, starsEarned: 2,
+      insightTitle: 'Careful counter', insightBody: 'You counted slowly and surely.', insightBadge: 'CAREFUL',
+    });
+    const relay = createRelay({
+      childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out, recapGenerator: recapGen,
+    });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+    const ev = await fake.events();
+
+    ev.onOutputTranscript('If 12 apples', false);
+    ev.onOutputTranscript(' are shared?', true);
+    ev.onInputTranscript('six each', true);
+
+    await relay.handleControl({ type: 'end' });
+
+    // The summarizer saw the assembled transcript script.
+    expect(recapGen.calls).toHaveLength(1);
+    expect(recapGen.calls[0].script).toContain('Pip: If 12 apples are shared?');
+    expect(recapGen.calls[0].script).toContain('VoiceTester: six each');
+
+    // The latest completed row holds the persisted recap + transcript.
+    const { db } = await import('../../src/db/client');
+    const { sessions } = await import('../../src/db/schema');
+    const { and, desc, eq } = await import('drizzle-orm');
+    const [row] = await db.select().from(sessions)
+      .where(and(eq(sessions.childId, VOICE_TEST_CHILD_ID), eq(sessions.state, 'completed')))
+      .orderBy(desc(sessions.endedAt)).limit(1);
+    expect(row.starsEarned).toBe(2);
+    expect(row.starsMax).toBe(3);
+    expect(row.insightBadge).toBe('CAREFUL');
+    expect(row.transcript).toEqual([
+      { role: 'pip', text: 'If 12 apples are shared?' },
+      { role: 'child', text: 'six each' },
+    ]);
   });
 });

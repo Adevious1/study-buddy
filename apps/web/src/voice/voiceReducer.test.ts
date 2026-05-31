@@ -50,3 +50,17 @@ describe('voiceReducer transcript accumulation', () => {
     expect(s.turns[s.turns.length - 1].text).toBe('turn 39');
   });
 });
+
+describe('ending (wrapping-up) state', () => {
+  it('transitions to ending on the ending action', () => {
+    const live: VoiceState = { status: 'live', turns: [], error: null };
+    const next = voiceReducer(live, { kind: 'ending' });
+    expect(next.status).toBe('ending');
+  });
+
+  it('still accepts a server ended status after ending', () => {
+    const ending: VoiceState = { status: 'ending', turns: [], error: null };
+    const next = voiceReducer(ending, { kind: 'server', msg: { type: 'status', state: 'ended' } });
+    expect(next.status).toBe('ended');
+  });
+});
