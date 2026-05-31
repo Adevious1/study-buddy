@@ -15,7 +15,7 @@ export function AppLayout() {
             Open dashboard ↗
           </Link>
         )}
-        <div className="flex flex-1 flex-col overflow-y-auto sb-scroll">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto sb-scroll">
           <Outlet />
         </div>
         {showNav && <BottomNav accent="var(--color-coral)" />}

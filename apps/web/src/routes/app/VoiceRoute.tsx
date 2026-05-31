@@ -188,7 +188,7 @@ export function VoiceRoute() {
 
   return (
     <div
-      className="flex-1 flex flex-col overflow-hidden"
+      className="flex-1 flex flex-col min-h-0 overflow-hidden"
       style={{ background: `radial-gradient(80% 60% at 50% 0%, var(--color-coral-l) 0%, var(--color-bg) 65%)` }}
     >
       <div className="flex items-center gap-3 px-[18px] py-3">
