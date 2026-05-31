@@ -1,6 +1,12 @@
 import type { ServerControl, VoiceErrorCode, VoiceStatus } from '@study-buddy/shared';
 
-export interface Turn { role: 'pip' | 'child'; text: string; }
+export interface Turn {
+  role: 'pip' | 'child';
+  text: string;
+  /** Whether this turn has been finalized. Gemini sends transcripts as incremental
+   *  deltas; an open turn accumulates them, a finalized one starts the next fresh. */
+  final: boolean;
+}
 export interface VoiceState {
   status: 'idle' | 'connecting' | VoiceStatus;
   turns: Turn[];
@@ -26,15 +32,18 @@ export function voiceReducer(state: VoiceState, action: VoiceAction): VoiceState
     case 'interrupted':
       return state;
     case 'transcript': {
+      // Gemini streams transcripts as incremental deltas. Append each delta to the
+      // current open turn for that role; once a turn is finalized (or the role
+      // switches), the next delta begins a new turn.
       const turns = [...state.turns];
       const last = turns[turns.length - 1];
-      if (last && last.role === msg.role) {
-        turns[turns.length - 1] = { role: msg.role, text: msg.text };
+      if (last && last.role === msg.role && !last.final) {
+        turns[turns.length - 1] = { role: msg.role, text: last.text + msg.text, final: msg.final };
       } else {
-        turns.push({ role: msg.role, text: msg.text });
+        turns.push({ role: msg.role, text: msg.text, final: msg.final });
       }
-      // keep the rolling window small
-      return { ...state, turns: turns.slice(-8) };
+      // keep a rolling window (the transcript panel is scrollable)
+      return { ...state, turns: turns.slice(-30) };
     }
     default:
       return state;
