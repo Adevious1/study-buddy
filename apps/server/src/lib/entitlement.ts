@@ -18,9 +18,16 @@ export interface Entitlement {
 const ENTITLED_STATUSES = new Set(['active', 'trialing', 'past_due']);
 
 export function entitlementOf(sub: SubRow, now: Date): Entitlement {
-  const entitled = sub.stripeSubscriptionId
-    ? ENTITLED_STATUSES.has(sub.status ?? '')
-    : now.getTime() < sub.trialEndsAt.getTime();
+  const inTrial = now.getTime() < sub.trialEndsAt.getTime();
+  // A subscription decides entitlement only once it carries a concrete Stripe status.
+  // `checkout.session.completed` writes the subscription id but no status; the status
+  // arrives moments later via `customer.subscription.*`. In that gap we fall back to
+  // the trial window (checkout carries the trial_end over, so trialEndsAt is still in
+  // the future) — otherwise a guardian who just paid would be briefly locked out.
+  const entitled =
+    sub.stripeSubscriptionId && sub.status
+      ? ENTITLED_STATUSES.has(sub.status)
+      : inTrial;
   return {
     entitled,
     status: sub.status,

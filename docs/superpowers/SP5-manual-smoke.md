@@ -120,3 +120,24 @@ Then, signed in as that guardian:
 - `/dashboard` still loads (so the guardian can pay).
 
 Report real results for each step.
+
+## Known limitations (accepted for the initial release)
+
+Surfaced by the SP5 branch review; deliberately deferred (the webhook is a simple
+reducer by design). None block normal use; each is follow-up hardening.
+
+- **Webhook ordering / no event-id dedup.** `routes/stripeWebhook.ts` applies events
+  in arrival order with no `event.id` dedup and no `current_period_end` monotonicity
+  guard. Stripe does not guarantee delivery order, so a late/out-of-order event could
+  overwrite newer state. Hardening = persist the processed `event.id` (or refuse to
+  move `current_period_end` backwards) before applying.
+- **Seat-sync partial state.** `POST /api/me/children` commits the child, then calls
+  `syncSeatQuantity`. If the Stripe quantity update throws, the child insert stands but
+  the local `seats` column drifts and the request errors. `syncSeatQuantity` re-derives
+  the count from `childCount` (no double-count), so a webhook-driven reconcile would
+  self-heal — not yet implemented.
+- **Post-checkout window.** Between `checkout.session.completed` (writes the
+  subscription id, no status) and the follow-up `customer.subscription.*` (writes the
+  status), entitlement falls back to the trial window so a just-paid guardian is never
+  locked out. During that brief gap `status` is still `null`, so the trial banner may
+  flash; it clears once the status event lands. (Handled in `lib/entitlement.ts`.)

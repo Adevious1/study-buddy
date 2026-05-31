@@ -32,6 +32,11 @@ stripeWebhookRoute.post('/', async (c) => {
     stripeSubscriptionId: row.stripeSubscriptionId, status: row.status,
     currentPeriodEnd: row.currentPeriodEnd, seats: row.seats,
   };
+  // Accepted limitation: events are applied in arrival order with no event-id dedup
+  // or current_period_end monotonicity guard, so a late/out-of-order event could
+  // overwrite newer state. Stripe does not guarantee delivery order; hardening
+  // (persist event.id, or refuse to move current_period_end backwards) is follow-up
+  // work. See docs/superpowers/SP5-manual-smoke.md "Known limitations".
   const next = applyStripeEvent(cur, event as unknown as StripeEventLike);
   await db.update(subscriptions).set({
     stripeSubscriptionId: next.stripeSubscriptionId,

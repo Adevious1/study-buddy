@@ -25,6 +25,12 @@ describe('entitlementOf', () => {
       expect(entitlementOf({ ...base, trialEndsAt: new Date(0), stripeSubscriptionId: 'sub_1', status }, now).entitled).toBe(false);
     }
   });
+  it('stays entitled right after checkout: subId set, status not yet written, trial window still open', () => {
+    // checkout.session.completed writes the subId but no status; the trial window
+    // (carried over via trial_end) keeps the just-paid guardian entitled until the
+    // follow-up customer.subscription.* event lands.
+    expect(entitlementOf({ ...base, stripeSubscriptionId: 'sub_1', status: null }, now).entitled).toBe(true);
+  });
 });
 
 describe('applyStripeEvent', () => {
