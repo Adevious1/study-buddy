@@ -5,11 +5,23 @@ import type {
 import type { Repository } from './repository';
 
 const base = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
-const childId = import.meta.env.VITE_CURRENT_CHILD_ID as string;
 
-if (!childId) {
-  // eslint-disable-next-line no-console
-  console.warn('VITE_CURRENT_CHILD_ID is not set — API calls will 400.');
+const STORAGE_KEY = 'sb.activeChildId';
+let activeChildId: string | null =
+  typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+
+export function setActiveChildId(id: string | null): void {
+  activeChildId = id;
+  if (typeof localStorage === 'undefined') return;
+  if (id) localStorage.setItem(STORAGE_KEY, id);
+  else localStorage.removeItem(STORAGE_KEY);
+}
+export function getActiveChildId(): string {
+  if (!activeChildId) throw new Error('No active child selected');
+  return activeChildId;
+}
+export function peekActiveChildId(): string | null {
+  return activeChildId;
 }
 
 export class ApiError extends Error {
@@ -19,7 +31,7 @@ export class ApiError extends Error {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${base}${path}`);
+  const res = await fetch(`${base}${path}`, { credentials: 'include' });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new ApiError(res.status, body);
@@ -27,13 +39,8 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-/**
- * Like get(), but maps an HTTP 404 to null. Use for resources that are
- * legitimately absent (no in-progress session, no recap yet, no profile yet) —
- * a missing row is an expected state, not a server error.
- */
 async function getOrNull<T>(path: string): Promise<T | null> {
-  const res = await fetch(`${base}${path}`);
+  const res = await fetch(`${base}${path}`, { credentials: 'include' });
   if (res.status === 404) return null;
   if (!res.ok) {
     const body = await res.json().catch(() => null);
@@ -43,13 +50,11 @@ async function getOrNull<T>(path: string): Promise<T | null> {
 }
 
 export const apiRepository: Repository = {
-  getStudent:          (): Promise<Student>                 => get(`/children/${childId}`),
-  getContinueSession:  (): Promise<ContinueSession | null>  => getOrNull(`/children/${childId}/sessions/continue`),
-  getTodayAssignments: (): Promise<Assignment[]>            => get(`/children/${childId}/assignments/today`),
-  getSubjects:         (): Promise<Subject[]>               => get(`/children/${childId}/subjects`),
-  getLearningProfile:  (): Promise<LearningProfile | null>  => getOrNull(`/children/${childId}/learning-profile`),
-  getWeekActivity:     (): Promise<WeekActivity>            => get(`/children/${childId}/activity?range=week`),
-  getRecap:            (): Promise<RecapResult | null>      => getOrNull(`/children/${childId}/sessions/latest/recap`),
+  getStudent:          (): Promise<Student>                => get(`/children/${getActiveChildId()}`),
+  getContinueSession:  (): Promise<ContinueSession | null> => getOrNull(`/children/${getActiveChildId()}/sessions/continue`),
+  getTodayAssignments: (): Promise<Assignment[]>           => get(`/children/${getActiveChildId()}/assignments/today`),
+  getSubjects:         (): Promise<Subject[]>              => get(`/children/${getActiveChildId()}/subjects`),
+  getLearningProfile:  (): Promise<LearningProfile | null> => getOrNull(`/children/${getActiveChildId()}/learning-profile`),
+  getWeekActivity:     (): Promise<WeekActivity>           => get(`/children/${getActiveChildId()}/activity?range=week`),
+  getRecap:            (): Promise<RecapResult | null>     => getOrNull(`/children/${getActiveChildId()}/sessions/latest/recap`),
 };
-
-export const CURRENT_CHILD_ID = childId;
