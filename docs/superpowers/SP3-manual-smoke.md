@@ -31,6 +31,40 @@ key is not the blocker — only the mic is).
 > hang. **Verify End/Back are responsive while still connecting** during the real
 > run; if they're dead, that's a bug to file.
 
+## Transcript fixes (2026-05-31) — verify these during the live run
+
+Three transcript/layout bugs were found and fixed after a live session showed the
+Pip bubble was unusable. The fixes were verified by unit test + by measuring the
+rendered geometry with mock turns (the mic still blocks a real session), but the
+**final visual confirmation belongs to the human run** — check each below:
+
+- **Full sentences, not fragments** (`fix(voice): accumulate transcript deltas`).
+  Gemini streams transcripts as incremental deltas; the reducer was *replacing*
+  the open turn with each delta, so a Pip bubble showed only the last fragment
+  ("growing?", "on today?"). Now deltas append into the open turn (a `final` flag
+  on each turn ends it). ✅ unit-tested (`apps/web/src/voice/voiceReducer.test.ts`,
+  run via `bun test`). **Verify:** Pip's bubbles show complete sentences that grow
+  as it speaks.
+- **Pip shrinks + transcript fills the screen** (`feat(voice): scrollable
+  transcript; Pip shrinks to top`). Before any turns, Pip is large/centered for the
+  calm "Listening…" state; once messages start, Pip shrinks (180→96) to the top and
+  the transcript takes the freed space. **Verify:** layout reflows once the first
+  turn arrives.
+- **Transcript scrolls; controls stay pinned** (`fix(voice): cap phone frame to
+  viewport height`). The phone frame used `min-h-screen` (a floor that grows past
+  the viewport), so a long conversation scrolled the whole page and pushed
+  Mute/Mic/End off the bottom. Frame is now `h-[100dvh]`/`h-full` so the transcript
+  has a bounded `overflow-y-auto` and auto-scrolls to the newest turn. ✅ verified
+  by geometry probe (doc no longer overflows; transcript `scrollH > clientH`; End
+  button within the viewport). **Verify:** with a long conversation, the controls
+  stay visible at the bottom and the messages scroll internally.
+
+> Driver note: to smoke this layout without a mic, the transcript can be populated
+> with mock turns and the rendered geometry measured via Playwright
+> (`getBoundingClientRect` / `scrollHeight` vs `clientHeight`). That empirical
+> check found the real cause (`min-h-screen`) after several CSS guesses that built
+> clean but didn't fix it — measure, don't reason, for layout bugs.
+
 ---
 
 ## Prerequisites
