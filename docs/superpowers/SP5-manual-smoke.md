@@ -39,6 +39,18 @@ docker compose exec -T -e CI=1 server sh -c 'cd /app && pnpm install --no-frozen
 docker compose restart server
 ```
 
+> **Restart long-running containers before smoking new commits.** The `web` and
+> `server` services bind-mount source, but a container that's been up since
+> *before* the commits under test can serve stale code — the Vite dev server
+> caches transformed modules, and the server process holds the old build. This
+> bit a prior smoke run: the `web` container (up 4h) served a pre-SP5
+> `onboardingRoute.ts` with no entitlement branch, so `/app` never redirected to
+> `/subscribe` even though the committed source was correct. If anything behaves
+> as though your latest change isn't present, `docker compose restart web server`
+> (then hard-reload the browser) — it's the runtime cousin of the
+> `docker-node-modules-sync` drift. To confirm what's actually served, fetch the
+> transformed module: `curl -s http://localhost:5173/src/routes/auth/onboardingRoute.ts`.
+
 Re-seed the dev DB if needed so you have a clean guardian. The web app is at
 `http://localhost:5173`, the API/relay at `http://localhost:3001`. Dev seed
 login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
