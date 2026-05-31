@@ -233,7 +233,7 @@ export function VoiceRoute() {
       {hasTurns && (
         <div
           ref={transcriptRef}
-          className="sb-scroll flex flex-1 flex-col gap-2 overflow-y-auto px-[18px] pt-2 pb-1"
+          className="sb-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-[18px] pt-2 pb-1"
         >
           {state.turns.map((t, i) => (
             <Bubble key={i} from={t.role === 'pip' ? 'pip' : 'user'}>{t.text}</Bubble>
@@ -241,7 +241,7 @@ export function VoiceRoute() {
         </div>
       )}
 
-      <div className="flex items-center justify-between px-6 pt-[14px] pb-[18px]">
+      <div className="flex shrink-0 items-center justify-between px-6 pt-[14px] pb-[18px]">
         <ControlBtn
           label={muted ? 'Unmute' : 'Mute'}
           onClick={() => { muted ? unmute() : mute(); setMuted((m) => !m); }}
