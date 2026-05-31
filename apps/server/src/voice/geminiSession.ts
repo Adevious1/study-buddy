@@ -50,6 +50,9 @@ export function makeGeminiConnector(apiKey: string): GeminiConnector {
       model: MODEL,
       config: {
         responseModalities: [Modality.AUDIO],
+        // Pin to English so the native-audio model doesn't auto-switch
+        // languages on noisy/short input (the system prompt reinforces this).
+        speechConfig: { languageCode: 'en-US' },
         systemInstruction: { parts: [{ text: opts.systemInstruction }] },
         inputAudioTranscription: {},
         outputAudioTranscription: {},
