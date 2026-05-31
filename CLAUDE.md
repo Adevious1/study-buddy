@@ -10,8 +10,9 @@ The design spec lives in `docs/superpowers/specs/`.
 
 ## Status
 
-**SP1 (UI), SP2 (backend + database), SP3 (live voice tutor), and SP4 (auth) are
-done and merged to `main`. SP5 (billing) is next.**
+**SP1 (UI), SP2 (backend + database), SP3 (live voice tutor), SP4 (auth), and
+SP5 (billing) are all done. SP1–SP4 are merged to `main`; SP5 is on the
+`sp5-billing` branch.**
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -26,10 +27,24 @@ login / onboarding (PIN → add child) / profile-picker / PIN-gated-dashboard
 screens; and **guardian-ownership authz in `childContext`** (the IDOR fix —
 unowned child → 404, no session → 401), which also protects the voice WS route.
 
-The live audio loop and the auth flow both require a browser (and, for Google,
-real OAuth creds); neither is smoke-tested in CI. See
-`docs/superpowers/SP3-manual-smoke.md` and `docs/superpowers/SP4-manual-smoke.md`.
-Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
+SP5 (billing): per-child seat-based **Stripe** subscription with a no-card trial
+on sign-up. The raw Stripe SDK is isolated in `lib/stripe.ts`; a `subscriptions`
+table is 1:1 with `guardians` (trial row created in the guardian-create auth
+hook); pure entitlement + a webhook reducer live in `lib/entitlement.ts`
+(unit-tested). A public signature-verified webhook (`routes/stripeWebhook.ts`,
+mounted before the authed `/api` tree) drives state. Entitlement is enforced
+**client-side** (`/app` → `/subscribe` via an entitlement-first
+`nextOnboardingDest`) and **server-side** (voice relay + add-child → 402 via
+`requireEntitled` / the `me.ts` gate); `/dashboard` stays reachable so a guardian
+can pay. Seat quantity = child count, synced to Stripe on add. No better-auth
+version change. Accepted limitations (webhook event ordering/dedup; seat-sync
+partial state) are documented in the smoke doc.
+
+The live audio loop, the auth flow, and the billing flow all require a browser
+(and, for Google/Stripe, real creds); none is smoke-tested in CI. See
+`docs/superpowers/SP3-manual-smoke.md`, `docs/superpowers/SP4-manual-smoke.md`,
+and `docs/superpowers/SP5-manual-smoke.md`. Dev seed login:
+`parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
 **Deferred to a later effort:** auto-generated session recap, transcript
 persistence, LLM-written profile notes, interactive hint chips, true subjectless
@@ -74,7 +89,10 @@ implementation cycle. **Do not collapse these into one effort.**
    login, runtime child-profile switcher (replaced `VITE_CURRENT_CHILD_ID`),
    onboarding/login/picker/PIN-gate screens, and guardian-ownership authz in
    `childContext` (IDOR fix). Gates `/app/*` and `/dashboard`.
-5. **Billing** — seat-based subscription + paywall on adding a child.
+5. **Billing** ✓ _done_ — Stripe seat-based subscription, no-card trial on sign-up,
+   public signature-verified webhook, entitlement gating (`/app` → `/subscribe`
+   client-side; voice + add-child → 402 server-side) with `/dashboard` kept
+   reachable to pay; seat quantity synced to child count. (On `sp5-billing`.)
 
 ## Planned layout (pnpm monorepo)
 
