@@ -9,6 +9,10 @@ export interface StartArgs { subjectKind: SubjectKind; topic: string; title: str
 
 const WS_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
 
+// Safety net: if the relay never confirms the session ended (crash/network),
+// stop waiting after this long so the child is never stuck "wrapping up".
+const RECAP_REVEAL_TIMEOUT_MS = 20_000;
+
 function wsUrl(childId: string): string {
   const httpBase = WS_BASE.startsWith('http')
     ? WS_BASE
@@ -23,10 +27,12 @@ export function useVoiceSession() {
   const captureRef = useRef<Capture | null>(null);
   const playerRef = useRef<AudioPlayer | null>(null);
   const mutedRef = useRef(false);
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const send = (m: ClientControl) => wsRef.current?.send(JSON.stringify(m));
 
   const teardown = useCallback(() => {
+    if (revealTimerRef.current) { clearTimeout(revealTimerRef.current); revealTimerRef.current = null; }
     captureRef.current?.stop();
     captureRef.current = null;
     playerRef.current?.close();
@@ -92,12 +98,19 @@ export function useVoiceSession() {
   }, [activeChildId]);
 
   const end = useCallback(() => {
-    // Send the graceful end first (WS preserves frame order, so the relay
-    // finalizes 'completed' + commits the profile before our close frame hits
-    // its abandoned-on-disconnect path, which finish() no-ops).
+    // Tell the relay to finish. KEEP the socket open so we receive its final
+    // 'ended' status once the recap is generated, then navigate to the recap.
     send({ type: 'end' });
-    teardown();
-    dispatch({ kind: 'server', msg: { type: 'status', state: 'ended' } });
+    // Stop the mic immediately (visual + privacy) without closing the socket.
+    captureRef.current?.stop();
+    captureRef.current = null;
+    dispatch({ kind: 'ending' });
+    if (!revealTimerRef.current) {
+      revealTimerRef.current = setTimeout(() => {
+        teardown();
+        dispatch({ kind: 'server', msg: { type: 'status', state: 'ended' } });
+      }, RECAP_REVEAL_TIMEOUT_MS);
+    }
   }, [teardown]);
 
   const mute = useCallback(() => { mutedRef.current = true; send({ type: 'mute' }); }, []);
