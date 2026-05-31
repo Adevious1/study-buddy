@@ -136,6 +136,13 @@ export function VoiceRoute() {
     if (state.status === 'live') wentLiveRef.current = true;
   }, [state.status]);
 
+  // Keep the transcript pinned to the newest turn as it grows.
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [state.turns]);
+
   // Return Home only when a session that truly went live ends cleanly. A session
   // that ends without ever connecting — React StrictMode's dev double-mount, a
   // failed connect, or a mic denial — must NOT bounce; let the error state show.
@@ -146,6 +153,9 @@ export function VoiceRoute() {
   const accent = 'var(--color-coral)';
   const pipState = state.status === 'live' ? 'listen' : state.status === 'connecting' ? 'think' : 'idle';
   const subjectTitle = useMemo(() => picked?.title ?? 'Talk with Pip', [picked]);
+  // Once there are messages, switch to the compact layout (small Pip up top,
+  // transcript fills the rest) so long turns are readable instead of clipped.
+  const hasTurns = state.turns.length > 0;
 
   if (state.error) {
     return (
@@ -206,19 +216,30 @@ export function VoiceRoute() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 pt-2">
-        <Pip size={180} state={pipState} color={pipColorValue} expression="happy" />
+      {/* Pip + status. Once the conversation has turns, Pip shrinks and moves up
+          so the transcript below can take the freed vertical space. */}
+      <div
+        className={`flex flex-col items-center gap-3 px-4 ${
+          hasTurns ? 'shrink-0 pt-1 pb-2' : 'flex-1 justify-center pt-2'
+        }`}
+      >
+        <Pip size={hasTurns ? 96 : 180} state={pipState} color={pipColorValue} expression="happy" />
         <div className="inline-flex items-center gap-2 px-[14px] py-2 bg-surface border-[1.5px] border-line rounded-full font-body font-bold text-[13px] text-ink-2 shadow-[0_2px_0_rgba(0,0,0,0.04)]">
           {state.status === 'live' && !muted ? <Waveform color={accent} height={14} bars={4} /> : <div className="w-2 h-2 rounded-full" style={{ background: 'var(--color-ink-4)' }} />}
           <span>{muted ? 'Muted' : state.status === 'live' ? 'Listening…' : state.status === 'resuming' ? 'One sec…' : 'Connecting…'}</span>
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 px-[18px] pt-3 pb-1">
-        {state.turns.slice(-2).map((t, i) => (
-          <Bubble key={i} from={t.role === 'pip' ? 'pip' : 'user'}>{t.text}</Bubble>
-        ))}
-      </div>
+      {hasTurns && (
+        <div
+          ref={transcriptRef}
+          className="sb-scroll flex flex-1 flex-col gap-2 overflow-y-auto px-[18px] pt-2 pb-1"
+        >
+          {state.turns.map((t, i) => (
+            <Bubble key={i} from={t.role === 'pip' ? 'pip' : 'user'}>{t.text}</Bubble>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center justify-between px-6 pt-[14px] pb-[18px]">
         <ControlBtn
