@@ -44,7 +44,7 @@ export function createRelay(opts: RelayOptions) {
           .select({ traitId: learningProfileTraits.traitId, label: learningProfileTraits.label, score: learningProfileTraits.score })
           .from(learningProfileTraits).where(eq(learningProfileTraits.profileId, profile.id))
       : [];
-    return buildSystemInstruction({
+    return await buildSystemInstruction({
       childName: child?.name ?? 'friend',
       grade: child?.grade ?? 3,
       subjectKind, topic,
