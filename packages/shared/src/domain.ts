@@ -83,3 +83,25 @@ export interface RecapResult {
   insightBody: string;
   insightBadge: string;
 }
+
+// --- Auth / API contracts ---
+
+export interface ChildProfileSummary {
+  id: string;
+  name: string;
+  grade: number;
+  pipColor: PipColor;
+}
+
+export interface MeResponse {
+  guardian: { id: string; email: string; name: string };
+  children: ChildProfileSummary[];
+  hasPin: boolean;
+}
+
+export interface CreateChildInput {
+  name: string;
+  birthDate: string; // YYYY-MM-DD
+  grade: number;
+  pipColor: PipColor;
+}

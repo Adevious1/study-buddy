@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   pgTable, uuid, text, integer, date, timestamp, jsonb, check, uniqueIndex, index, boolean,
 } from 'drizzle-orm/pg-core';
+import type { PipColor } from '@study-buddy/shared';
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -78,7 +79,7 @@ export const children = pgTable(
     name: text('name').notNull(),
     birthDate: date('birth_date').notNull(),
     grade: integer('grade').notNull(),
-    pipColor: text('pip_color').notNull(),
+    pipColor: text('pip_color').notNull().$type<PipColor>(),
     startedWithPipOn: date('started_with_pip_on').notNull(),
     streakDays: integer('streak_days').notNull().default(0),
     starsToday: integer('stars_today').notNull().default(0),

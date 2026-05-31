@@ -10,12 +10,14 @@ import { activityRoute } from './routes/activity';
 import { childContext, type ChildVariables } from './lib/childContext';
 import { voiceRoute, voiceWebsocket } from './voice/voiceRoute';
 import { auth } from './lib/auth';
+import { meRoute } from './routes/me';
 
 export const app = new Hono();
 app.use('*', requestLogger);
 app.route('/', healthRoute);
 // better-auth handler — public, must precede the child-scoped /api routes
 app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw));
+app.route('/api/me', meRoute);
 
 const api = new Hono<{ Variables: ChildVariables }>();
 api.use('/children/:childId/*', childContext);
