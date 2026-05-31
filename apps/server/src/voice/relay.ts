@@ -109,6 +109,16 @@ export function createRelay(opts: RelayOptions) {
       const systemInstruction = await buildPrompt(subjectKind, topic);
       session = await connector({ systemInstruction, resumptionHandle }, events());
       sessionRowId = await createLiveSession(childId, subjectKind, title);
+      // If the child ended/left while we were still connecting, finish() has
+      // already run (it saw a null sessionRowId and skipped the DB). Do NOT go
+      // live: close the freshly-opened Gemini session and finalize the orphaned
+      // row as abandoned. Otherwise late ready/live messages would flip the
+      // client out of its wrapping-up screen and re-open the mic.
+      if ((state as State) === 'ended') {
+        try { await session?.close(); } catch { /* ignore */ }
+        try { await finalizeLiveSession(sessionRowId, 'abandoned'); } catch { /* ignore */ }
+        return;
+      }
       state = 'live';
       sink.sendControl({ type: 'ready' });
       sink.sendControl({ type: 'status', state: 'live' });
@@ -127,6 +137,9 @@ export function createRelay(opts: RelayOptions) {
     if (capTimer) { clearTimeout(capTimer); capTimer = null; }
     try { await session?.close(); } catch { /* ignore */ }
     const turns = transcript.turns();
+    // If a DB write below throws, the row stays in_progress (never surfaces as a
+    // recap) and the child sees their previous completed recap — acceptable
+    // degradation. The finally still emits 'ended' so the client always advances.
     try {
       if (sessionRowId) {
         if (finalState === 'completed') {

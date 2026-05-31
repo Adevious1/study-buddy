@@ -84,7 +84,7 @@ export function parseRecapContent(raw: unknown): RecapContent | null {
   return {
     starsEarned,
     starsMax: STARS_MAX,
-    solvedSelf,
+    solvedSelf: Math.min(solvedSelf, solvedTotal),
     solvedTotal,
     figuredOut: parseFiguredOut(a.figuredOut),
     insightTitle: a.insightTitle,

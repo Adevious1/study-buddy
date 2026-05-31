@@ -39,6 +39,12 @@ describe('parseRecapContent', () => {
     expect(r!.figuredOut).toEqual([{ ok: true, text: 'kept' }]);
   });
 
+  it('clamps solvedSelf to not exceed solvedTotal', () => {
+    const r = parseRecapContent({ ...valid, solvedSelf: 3, solvedTotal: 1 });
+    expect(r!.solvedSelf).toBe(1);
+    expect(r!.solvedTotal).toBe(1);
+  });
+
   it('returns null when required fields are missing or wrong-typed', () => {
     expect(parseRecapContent(null)).toBeNull();
     expect(parseRecapContent({})).toBeNull();

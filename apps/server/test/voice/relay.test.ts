@@ -87,6 +87,41 @@ describe('voice relay', () => {
     expect(fake.sent.audio).toHaveLength(1);
   });
 
+  it('does not go live (and cleans up) if the session ends while still connecting', async () => {
+    // A connector we resolve manually, to interleave end() between connect start and finish.
+    let resolveConnect: ((s: unknown) => void) | null = null;
+    let connectorInvoked!: () => void;
+    // connectorReadyP resolves once start() actually calls connector(), i.e. after
+    // buildPrompt's DB work completes and start() is blocked inside the connector await.
+    const connectorReadyP = new Promise<void>((r) => { connectorInvoked = r; });
+    const fakeSession = {
+      closed: false,
+      sendAudio() {}, sendText() {}, ackTool() {}, audioStreamEnd() {},
+      close: async () => { fakeSession.closed = true; },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const connector = (_opts: any, _events: any) => new Promise((r) => {
+      resolveConnect = r as (s: unknown) => void;
+      connectorInvoked();
+    });
+    const out = sink();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: connector as any, sink: out });
+
+    const startP = relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'X', title: 'X' });
+    // Wait until the connector has been invoked (start() is now inside connector await).
+    await connectorReadyP;
+    // End arrives while start() is still awaiting the connector.
+    await relay.handleControl({ type: 'end' });
+    // Now the connector resolves — start() must detect the ended state and bail.
+    resolveConnect!(fakeSession);
+    await startP;
+
+    expect(out.control.some((m) => m.type === 'ready')).toBe(false);
+    expect(out.control.some((m) => m.type === 'status' && m.state === 'live')).toBe(false);
+    expect(fakeSession.closed).toBe(true);
+  });
+
   it('accumulates the transcript and persists a recap on completed end', async () => {
     const fake = makeFakeGemini();
     const out = sink();
