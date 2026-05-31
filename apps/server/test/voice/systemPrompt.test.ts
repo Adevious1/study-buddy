@@ -82,14 +82,28 @@ describe('renderTemplate', () => {
   });
 });
 
+// Run `fn` with STUDY_BUDDY_PROMPT_PATH pointed at a missing file, so
+// buildSystemInstruction/loadTemplate exercise the in-code BUILTIN_TEMPLATE
+// fallback rather than the (intentionally diverged) shipped study-buddy.md.
+async function withBuiltinFallback<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
+  process.env.STUDY_BUDDY_PROMPT_PATH = join(tmpdir(), 'sb-builtin-fallback-xyz.md');
+  try {
+    return await fn();
+  } finally {
+    if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
+    else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
+  }
+}
+
 describe('buildSystemInstruction (built-in template)', () => {
   it('reproduces the previous output byte-for-byte (with a trait)', async () => {
-    const out = await buildSystemInstruction(inputWithTrait);
+    const out = await withBuiltinFallback(() => buildSystemInstruction(inputWithTrait));
     expect(out).toBe(EXPECTED_WITH_TRAIT);
   });
 
   it('omits the learning-style line when there are no traits', async () => {
-    const out = await buildSystemInstruction(inputNoTrait);
+    const out = await withBuiltinFallback(() => buildSystemInstruction(inputNoTrait));
     expect(out).toBe(EXPECTED_NO_TRAIT);
   });
 });
@@ -130,20 +144,32 @@ describe('loadTemplate', () => {
     }
   });
 
-  it('the shipped study-buddy.md is present and matches the built-in', async () => {
-    // Fails loudly if the file is deleted or drifts from BUILTIN_TEMPLATE,
-    // rather than being silently masked by loadTemplate's fallback.
+  // The shipped study-buddy.md is intentionally tuned and may diverge from the
+  // in-code BUILTIN_TEMPLATE (which stays as the safe fallback). So instead of
+  // byte-identity we assert structural invariants the file must always satisfy.
+  it('the shipped study-buddy.md is present and contains all five tokens', async () => {
     const raw = await readFile(join(import.meta.dir, '..', '..', 'study-buddy.md'), 'utf8');
-    expect(raw).toBe(BUILTIN_TEMPLATE);
+    for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{traitLean}}']) {
+      expect(raw).toContain(t);
+    }
   });
 
-  it('the shipped study-buddy.md renders byte-identical to the built-in', async () => {
+  it('the shipped study-buddy.md renders with every token substituted', async () => {
     const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
     // From apps/server/test/voice/ up to apps/server/study-buddy.md
     process.env.STUDY_BUDDY_PROMPT_PATH = join(import.meta.dir, '..', '..', 'study-buddy.md');
     try {
       const out = await buildSystemInstruction(inputWithTrait);
-      expect(out).toBe(EXPECTED_WITH_TRAIT);
+      // No unsubstituted {{...}} placeholders survive into the prompt.
+      expect(out).not.toMatch(/\{\{.*?\}\}/);
+      // Live data landed.
+      expect(out).toContain('Maya');
+      expect(out).toContain('Math');
+      expect(out).toContain('Fractions');
+      // The non-negotiable Socratic guardrail and the learning-signal tool
+      // instruction must always be present, however the file is tuned.
+      expect(out).toContain('NEVER state the final answer');
+      expect(out).toContain('note_learning_signal');
     } finally {
       if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
       else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
