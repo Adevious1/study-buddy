@@ -32,6 +32,11 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
+      BILLING_TRIAL_DAYS: ${BILLING_TRIAL_DAYS:-14}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:5173}
     volumes:
       - ./apps/server:/app/apps/server
       - ./packages/shared:/app/packages/shared
