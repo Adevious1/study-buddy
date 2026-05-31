@@ -22,12 +22,38 @@
   string. Stays small (~80 lines).
 - **Create** `apps/server/study-buddy.md` — the editable, hot-reloaded template.
   Content equals `BUILTIN_TEMPLATE`.
-- **Create** `apps/server/src/voice/systemPrompt.test.ts` — pure unit tests (no DB):
+- **Replace** `apps/server/test/voice/systemPrompt.test.ts` — this file **already
+  exists** with synchronous `.toContain` assertions that will break once
+  `buildSystemInstruction` becomes async. Replace it with pure unit tests (no DB):
   faithful-port byte-equality, token substitution, heading stripping, unknown-token
-  passthrough, file load, fallback.
+  passthrough, file load, fallback. (Tests live under `apps/server/test/`, not
+  co-located in `src/`. Import the module via `../../src/voice/systemPrompt`.)
 - **Modify** `apps/server/src/voice/relay.ts:47` — add `await` (now that
   `buildSystemInstruction` is async). `buildPrompt` is already async and already
   `return`s the call, so this is a one-keyword change.
+
+## Pre-existing tests (verified)
+
+- `apps/server/test/voice/systemPrompt.test.ts` is the **only** file that imports
+  `buildSystemInstruction`. It currently calls it synchronously; Task 1 replaces it
+  wholesale, and its byte-equality assertions subsume the old `.toContain` checks
+  (Socratic rule, child/subject, topic, trait label).
+- `apps/server/test/voice/relay.test.ts` is a **DB test** (its `beforeAll` calls
+  `ensureTestDb`/`migrateAndSeedTestDb`, so it needs the throwaway Postgres on
+  5433). Every test calls `handleControl({ type: 'start', ... })`, and the first
+  asserts `opts.systemInstruction` contains `'VoiceTester'` and
+  `'note_learning_signal'`. Because the relay reaches the prompt builder only via
+  the **already-async** `handleControl`/`start` path (it already `await`s
+  `buildPrompt`), the async `buildSystemInstruction` is transparent — these
+  assertions still hold (`VoiceTester` is the child name → `{{childName}}`;
+  `note_learning_signal` is in the learning-signal section). No change needed to
+  this file; it is the regression guard that the relay still builds a real prompt.
+- Bun test config: `apps/server/bunfig.toml` preloads `./test/preload.ts` (which
+  sets `DATABASE_URL` from `PG_TEST_HOST`/`PG_TEST_PORT`). The new tests'
+  `STUDY_BUDDY_PROMPT_PATH` manipulation is independent of that.
+  `apps/server/tsconfig.json` sets `"types": ["bun-types"]` with
+  `skipLibCheck: true`, so `import.meta.dir` typechecks under `tsc --noEmit`
+  (existing code already uses `import.meta.main`).
 
 ## Reference: today's exact output
 
@@ -55,11 +81,12 @@ implementation must reproduce both cases byte-for-byte.
 
 **Files:**
 - Modify: `apps/server/src/voice/systemPrompt.ts`
-- Test: `apps/server/src/voice/systemPrompt.test.ts` (create)
+- Test: `apps/server/test/voice/systemPrompt.test.ts` (REPLACE existing — currently
+  holds synchronous `.toContain` tests that the async change would break)
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Replace the existing test file with the failing tests**
 
-Create `apps/server/src/voice/systemPrompt.test.ts`:
+Replace the entire contents of `apps/server/test/voice/systemPrompt.test.ts` with:
 
 ```typescript
 import { describe, it, expect } from 'bun:test';
@@ -67,8 +94,8 @@ import {
   BUILTIN_TEMPLATE,
   renderTemplate,
   buildSystemInstruction,
-} from './systemPrompt';
-import type { SystemPromptInput } from './systemPrompt';
+} from '../../src/voice/systemPrompt';
+import type { SystemPromptInput } from '../../src/voice/systemPrompt';
 
 // The exact string the previous hardcoded implementation produced.
 const EXPECTED_WITH_TRAIT = [
@@ -159,9 +186,9 @@ describe('BUILTIN_TEMPLATE', () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cd apps/server && bun test src/voice/systemPrompt.test.ts`
+Run: `cd apps/server && bun test test/voice/systemPrompt.test.ts`
 Expected: FAIL — `BUILTIN_TEMPLATE` / `renderTemplate` are not exported yet, and
-`buildSystemInstruction` is not async.
+`buildSystemInstruction` is not async (the `await`ed byte-equality tests fail).
 
 - [ ] **Step 3: Rewrite `systemPrompt.ts`**
 
@@ -273,13 +300,13 @@ line, yielding exactly the previous newline-joined output.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cd apps/server && bun test src/voice/systemPrompt.test.ts`
+Run: `cd apps/server && bun test test/voice/systemPrompt.test.ts`
 Expected: PASS — all describe blocks green (byte-equality with and without traits).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/server/src/voice/systemPrompt.ts apps/server/src/voice/systemPrompt.test.ts
+git add apps/server/src/voice/systemPrompt.ts apps/server/test/voice/systemPrompt.test.ts
 git commit -m "feat(voice): template-driven system prompt with built-in fallback
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
@@ -291,14 +318,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Create: `apps/server/study-buddy.md`
-- Test: `apps/server/src/voice/systemPrompt.test.ts` (append)
+- Test: `apps/server/test/voice/systemPrompt.test.ts` (append)
 
 - [ ] **Step 1: Write the failing tests (append to the test file)**
 
-Append to `apps/server/src/voice/systemPrompt.test.ts`:
+Append to `apps/server/test/voice/systemPrompt.test.ts`:
 
 ```typescript
-import { loadTemplate } from './systemPrompt';
+import { loadTemplate } from '../../src/voice/systemPrompt';
 import { writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -333,6 +360,7 @@ describe('loadTemplate', () => {
 
   it('the shipped study-buddy.md renders byte-identical to the built-in', async () => {
     const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
+    // From apps/server/test/voice/ up to apps/server/study-buddy.md
     process.env.STUDY_BUDDY_PROMPT_PATH = join(import.meta.dir, '..', '..', 'study-buddy.md');
     try {
       const out = await buildSystemInstruction(inputWithTrait);
@@ -347,12 +375,13 @@ describe('loadTemplate', () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cd apps/server && bun test src/voice/systemPrompt.test.ts`
-Expected: the "shipped study-buddy.md" test FAILS (file does not exist yet → falls
-back to built-in, which happens to match... so confirm it fails on the
-`STUDY_BUDDY_PROMPT_PATH` read). The other two should pass. If all pass because the
-fallback masks the missing file, that is acceptable — the next step makes the file
-real and the test meaningful.
+Run: `cd apps/server && bun test test/voice/systemPrompt.test.ts`
+Expected: the "shipped study-buddy.md" test passes only because the missing file
+falls back to the built-in (which matches). That fallback masks the missing file,
+so this test is **not yet meaningful** — the next step makes the file real, after
+which the test genuinely exercises the on-disk file. The load and fallback tests
+pass already. (This is the one acceptable case where a test is green before its
+production artifact exists; Step 3 makes it real.)
 
 - [ ] **Step 3: Create `apps/server/study-buddy.md`**
 
@@ -387,14 +416,14 @@ When you notice {{childName}} responding well to a way of learning — drawing/p
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cd apps/server && bun test src/voice/systemPrompt.test.ts`
-Expected: PASS — all load/fallback tests green; the shipped-file test confirms the
-real `study-buddy.md` renders byte-identical to the built-in.
+Run: `cd apps/server && bun test test/voice/systemPrompt.test.ts`
+Expected: PASS — all load/fallback tests green; the shipped-file test now confirms
+the real `study-buddy.md` renders byte-identical to the built-in.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/server/study-buddy.md apps/server/src/voice/systemPrompt.test.ts
+git add apps/server/study-buddy.md apps/server/test/voice/systemPrompt.test.ts
 git commit -m "feat(voice): ship editable study-buddy.md (hot-reloaded template)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
@@ -443,7 +472,8 @@ Expected: clean (no errors). This proves `buildSystemInstruction`'s new
 
 - [ ] **Step 3: Run the full server test suite**
 
-Start the throwaway Postgres if needed, then:
+The relay/profileCommit/api.smoke suites touch the DB, so start the throwaway
+Postgres on 5433 first (per [[running-server-db-tests]]), then run the whole suite:
 
 ```bash
 export PATH="/usr/local/bin:$PATH"
@@ -451,7 +481,9 @@ docker ps --filter name=sb-test-pg --format '{{.Names}}' | grep -q sb-test-pg ||
 cd apps/server && PG_TEST_HOST=localhost PG_TEST_PORT=5433 bun test
 ```
 
-Expected: all suites PASS (the new systemPrompt tests + existing relay/tools/profileCommit).
+Expected: all suites PASS. In particular `test/voice/relay.test.ts` still passes —
+its `opts.systemInstruction` `.toContain('VoiceTester')` / `'note_learning_signal'`
+assertions confirm the relay builds a real prompt through the now-async builder.
 
 - [ ] **Step 4: Commit**
 
@@ -554,3 +586,9 @@ score }` (confirmed in `packages/shared/src/domain.ts:46-47`) — matches the te
 fixtures. `buildSystemInstruction` returns `Promise<string>` consistently in Tasks
 1 and 3. `renderTemplate(tpl, values)` and `loadTemplate()` signatures match across
 tasks. ✓
+
+**Path consistency (verified against the repo):** Tests live under
+`apps/server/test/voice/`, imported via `../../src/voice/systemPrompt` — every test
+path and `bun test` command in this plan uses that location, not a co-located
+`src/` path. The existing `test/voice/systemPrompt.test.ts` (sync) is replaced in
+Task 1, not duplicated. `relay.ts:47` is the exact line changed in Task 3. ✓
