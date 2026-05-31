@@ -6,7 +6,8 @@ import { buildSystemInstruction } from './systemPrompt';
 import { SignalAccumulator } from './tools';
 import { createLiveSession, finalizeLiveSession, countSessionsForChild } from './sessionRow';
 import { commitLearningProfile } from './profileCommit';
-import { stripTextArtifact } from './transcript';
+import { TranscriptAccumulator, stripTextArtifact } from './transcript';
+import { generateRecap, type RecapGenerator } from '../recap/generateRecap';
 import type { GeminiConnector, GeminiLiveSession, GeminiEvents } from './geminiSession';
 
 export interface RelaySink {
@@ -19,6 +20,7 @@ export interface RelayOptions {
   connector: GeminiConnector;
   sink: RelaySink;
   softCapMs?: number; // default 10 min
+  recapGenerator?: RecapGenerator | null;
 }
 
 type State = 'idle' | 'connecting' | 'live' | 'resuming' | 'ended';
@@ -28,6 +30,10 @@ const SOFT_CAP_MS = 10 * 60 * 1000;
 export function createRelay(opts: RelayOptions) {
   const { childId, connector, sink } = opts;
   const signals = new SignalAccumulator();
+  const transcript = new TranscriptAccumulator();
+  let childName = 'friend';
+  let childGrade = 3;
+  let meta: { subjectKind: SubjectKind; topic: string } | null = null;
 
   let state: State = 'idle';
   let session: GeminiLiveSession | null = null;
@@ -48,12 +54,14 @@ export function createRelay(opts: RelayOptions) {
           .select({ traitId: learningProfileTraits.traitId, label: learningProfileTraits.label, score: learningProfileTraits.score })
           .from(learningProfileTraits).where(eq(learningProfileTraits.profileId, profile.id))
       : [];
+    childName = child?.name ?? 'friend';
+    childGrade = child?.grade ?? 3;
     // Count existing sessions BEFORE createLiveSession inserts this one, so a
     // brand-new child (zero rows) gets Pip's one-time self-introduction.
     const priorSessions = await countSessionsForChild(childId);
     return await buildSystemInstruction({
-      childName: child?.name ?? 'friend',
-      grade: child?.grade ?? 3,
+      childName,
+      grade: childGrade,
       subjectKind, topic,
       firstSession: priorSessions === 0,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,13 +72,17 @@ export function createRelay(opts: RelayOptions) {
   function events(): GeminiEvents {
     return {
       onAudio: (pcm) => sink.sendBinary(pcm),
-      onInputTranscript: (text, final) => sink.sendControl({ type: 'transcript', role: 'child', text, final }),
+      onInputTranscript: (text, final) => {
+        transcript.add('child', text, final);
+        sink.sendControl({ type: 'transcript', role: 'child', text, final });
+      },
       onOutputTranscript: (text, final) => {
         // Gemini's native-audio output transcription occasionally prefixes a
         // stray "Text " token at the very start of a turn. Strip it only on the
         // first delta of each Pip turn so a legitimate later "Text" is untouched.
         const clean = pipTurnOpen ? text : stripTextArtifact(text);
         pipTurnOpen = !final;
+        transcript.add('pip', clean, final);
         sink.sendControl({ type: 'transcript', role: 'pip', text: clean, final });
       },
       onInterrupted: () => {
@@ -92,6 +104,7 @@ export function createRelay(opts: RelayOptions) {
   async function start(subjectKind: SubjectKind, topic: string, title: string) {
     if (state !== 'idle') return;
     state = 'connecting';
+    meta = { subjectKind, topic };
     try {
       const systemInstruction = await buildPrompt(subjectKind, topic);
       session = await connector({ systemInstruction, resumptionHandle }, events());
@@ -113,8 +126,25 @@ export function createRelay(opts: RelayOptions) {
     state = 'ended';
     if (capTimer) { clearTimeout(capTimer); capTimer = null; }
     try { await session?.close(); } catch { /* ignore */ }
-    if (sessionRowId) await finalizeLiveSession(sessionRowId, finalState);
-    if (finalState === 'completed') await commitLearningProfile(childId, signals.all());
+    const turns = transcript.turns();
+    if (sessionRowId) {
+      if (finalState === 'completed') {
+        const recap = await generateRecap(
+          {
+            turns,
+            childName,
+            grade: childGrade,
+            subjectKind: meta?.subjectKind ?? 'math',
+            topic: meta?.topic ?? '',
+          },
+          opts.recapGenerator ?? null,
+        );
+        await finalizeLiveSession(sessionRowId, 'completed', { transcript: turns, recap });
+        await commitLearningProfile(childId, signals.all());
+      } else {
+        await finalizeLiveSession(sessionRowId, 'abandoned', { transcript: turns });
+      }
+    }
     sink.sendControl({ type: 'status', state: 'ended' });
   }
 
