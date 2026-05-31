@@ -6,7 +6,7 @@ import { db } from '../db/client';
 import { children, guardians } from '../db/schema';
 import { guardianContext, type GuardianVariables } from '../lib/guardianContext';
 import { isLocked, recordFail, clearFails } from '../lib/pinLockout';
-import { getEntitlement } from '../lib/billing';
+import { getEntitlement, syncSeatQuantity } from '../lib/billing';
 import type { MeResponse } from '@study-buddy/shared';
 
 export const meRoute = new Hono<{ Variables: GuardianVariables }>();
@@ -75,6 +75,10 @@ const createChildSchema = z.object({
 
 meRoute.post('/children', async (c) => {
   const g = c.get('guardian');
+  const ent = await getEntitlement(g.id);
+  if (!ent.entitled) {
+    return c.json({ error: { code: 'subscription_required', message: 'An active subscription is required' } }, 402);
+  }
   const json = await c.req.json().catch(() => null);
   const parsed = createChildSchema.safeParse(json);
   if (!parsed.success) {
@@ -90,5 +94,6 @@ meRoute.post('/children', async (c) => {
     startedWithPipOn: today,
   }).returning();
 
+  await syncSeatQuantity(g.id);
   return c.json({ id: child.id, name: child.name, grade: child.grade, pipColor: child.pipColor }, 201);
 });
