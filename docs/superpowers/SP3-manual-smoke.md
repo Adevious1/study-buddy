@@ -1,8 +1,35 @@
 # SP3 Manual Smoke Checklist — Live Voice Tutor
 
-> **NOT YET EXECUTED.** This checklist requires a real `GEMINI_API_KEY` and a
-> browser with microphone access. It cannot be run in CI. A human must work
-> through it locally before declaring SP3 fully verified.
+> **PARTIALLY VERIFIED (2026-05-31).** The connection scaffolding + config are
+> healthy; the audio loop is still unverified because it needs a real microphone.
+> A human must complete the mic-dependent items locally before declaring SP3 fully
+> verified. See "Partial verification" below for what's already confirmed.
+
+## Partial verification (2026-05-31, via Playwright — no microphone)
+
+Driven against the live Docker stack signed in as the dev seed guardian. The
+automated browser has no working mic, so `getUserMedia({audio:true})` **hangs**
+(a fake audioinput device is present, but the permission grant never resolves).
+The voice connect flow awaits the mic *before* opening the WebSocket, so the
+session can't progress past "Connecting…". `GEMINI_API_KEY` IS configured (so the
+key is not the blocker — only the mic is).
+
+| Check | Result |
+|---|---|
+| `GEMINI_API_KEY` present (server container) | ✅ set |
+| Voice screen renders (header, Pip, Mute / mic-toggle / End) | ✅ |
+| Capture worklet `/pcm-capture-worklet.js` | ✅ 200 (no 404) |
+| Voice client modules load (`useVoiceSession`, `audioCapture`, `audioPlayback`, `pcm`, `voiceReducer`) | ✅ 200 |
+| Screen reaches "Connecting…" | ✅ |
+| Console errors during attempt | ✅ 0 |
+| WS upgrade `GET /api/children/:id/voice` | ❌ never sent (client blocked on mic await) — **unverified** |
+| Audio in/out, transcript, barge-in, Socratic, profile commit, soft cap | ❌ **unverified** (all mic-dependent) |
+
+> **Open question for the human run:** from the stuck "Connecting…" state (mic
+> never resolved), neither **End** nor **Back** navigated away. Couldn't tell if
+> that's a real bug (controls inert until connected) or an artifact of the mic
+> hang. **Verify End/Back are responsive while still connecting** during the real
+> run; if they're dead, that's a bug to file.
 
 ---
 
