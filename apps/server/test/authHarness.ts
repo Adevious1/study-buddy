@@ -21,6 +21,29 @@ export interface GuardianHandle {
 }
 
 /**
+ * Turn a Response's Set-Cookie header(s) into a `Cookie` request-header string
+ * (name=value pairs only; attributes like Path/HttpOnly/SameSite stripped).
+ * `Headers.getSetCookie()` returns each cookie separately (Fetch API standard);
+ * the fallback splits a combined header on commas that precede a new `name=`.
+ */
+function extractCookieHeader(headers: Headers, context: string): string {
+  const setCookieValues: string[] =
+    typeof headers.getSetCookie === 'function'
+      ? headers.getSetCookie()
+      : (headers.get('set-cookie') ?? '').split(/,(?=[^ ])/).filter(Boolean);
+
+  const cookiePairs = setCookieValues.map((raw) => raw.split(';')[0].trim()).filter(Boolean);
+
+  if (cookiePairs.length === 0) {
+    throw new Error(
+      `[authHarness] ${context}: no set-cookie header returned. ` +
+        `Check that emailAndPassword is enabled and the server is not in production mode.`,
+    );
+  }
+  return cookiePairs.join('; ');
+}
+
+/**
  * Sign up a new guardian via better-auth's email/password path and return
  * the guardianId plus a Cookie request-header string ready for use in tests.
  *
@@ -36,31 +59,7 @@ export async function makeGuardian(email: string): Promise<GuardianHandle> {
     returnHeaders: true,
   });
 
-  // The return type is { headers: Headers; response: {...} }
-  const headers: Headers = result.headers;
-
-  // Collect all Set-Cookie headers and convert to a single Cookie string.
-  // Headers.getSetCookie() returns each header separately (Fetch API standard).
-  // Each value looks like: "better-auth.session_token=abc123; Path=/; HttpOnly; SameSite=Lax"
-  // We only keep the name=value portion (everything before the first ";").
-  const setCookieValues: string[] =
-    typeof headers.getSetCookie === 'function'
-      ? headers.getSetCookie()
-      : // Fallback for environments where getSetCookie is not available.
-        (headers.get('set-cookie') ?? '').split(/,(?=[^ ])/).filter(Boolean);
-
-  const cookiePairs = setCookieValues
-    .map((raw) => raw.split(';')[0].trim())
-    .filter(Boolean);
-
-  if (cookiePairs.length === 0) {
-    throw new Error(
-      `[authHarness] makeGuardian: no set-cookie header returned for ${email}. ` +
-        `Check that emailAndPassword is enabled and the server is not in production mode.`,
-    );
-  }
-
-  const cookie = cookiePairs.join('; ');
+  const cookie = extractCookieHeader(result.headers, `makeGuardian(${email})`);
 
   // Look up the guardian row created by the databaseHooks.user.create.after hook.
   const [guardianRow] = await db
@@ -77,4 +76,10 @@ export async function makeGuardian(email: string): Promise<GuardianHandle> {
   }
 
   return { guardianId: guardianRow.id, cookie };
+}
+
+/** Sign in an EXISTING user (created by the seed or makeGuardian) and return a Cookie header. */
+export async function signInGuardian(email: string, password: string): Promise<string> {
+  const result = await auth.api.signInEmail({ body: { email, password }, returnHeaders: true });
+  return extractCookieHeader(result.headers, `signInGuardian(${email})`);
 }

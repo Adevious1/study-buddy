@@ -1,11 +1,11 @@
-import { count } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { db, sql } from './client';
 import {
   guardians, children, plans, assignments,
   sessions, learningProfiles, learningProfileTraits,
 } from './schema';
+import { auth } from '../lib/auth';
 
-const GUARDIAN_ID = '00000000-0000-0000-0000-0000000000a1';
 const MAYA_ID = '00000000-0000-0000-0000-000000000001';
 const PLAN_ID = '00000000-0000-0000-0000-000000000010';
 const PROFILE_ID = '00000000-0000-0000-0000-000000000020';
@@ -27,6 +27,31 @@ async function main(opts: { closeConnection?: boolean } = {}) {
   }
 
   console.log('[seed] populating Maya…');
+
+  // Seed guardian as a real better-auth user so a developer/tests can sign in.
+  // The create-hook in lib/auth.ts inserts the linked guardians row.
+  //
+  // Note: signUpEmail commits the user + guardian OUTSIDE the Maya transaction
+  // below (better-auth uses its own writes). If that transaction later fails,
+  // the guardian is left without children — but the `count(children) === 0`
+  // guard above still lets a re-run proceed: signUpEmail throws "already exists"
+  // (caught), the lookup finds the guardian, and the transaction retries. Safe
+  // for a seed script; we don't need atomicity across the two phases.
+  try {
+    await auth.api.signUpEmail({
+      body: { email: 'parent@studybuddy.dev', password: 'studybuddy', name: "Maya's Parent" },
+    });
+  } catch (err) {
+    // If the user already exists (e.g. partial prior run), continue to the lookup.
+    console.warn('[seed] signUpEmail (may already exist):', (err as Error).message);
+  }
+  const [seedGuardian] = await db
+    .select({ id: guardians.id })
+    .from(guardians)
+    .where(eq(guardians.email, 'parent@studybuddy.dev'))
+    .limit(1);
+  if (!seedGuardian) throw new Error('[seed] guardian row not created by auth hook');
+  const guardianId = seedGuardian.id;
 
   const now = new Date();
 
@@ -61,15 +86,9 @@ async function main(opts: { closeConnection?: boolean } = {}) {
   // rather than leaving a partial graph that the children-count guard would then
   // treat as "already seeded" and skip forever.
   await db.transaction(async (tx) => {
-    await tx.insert(guardians).values({
-      id: GUARDIAN_ID,
-      email: 'alex@example.com',
-      name: 'Alex Chen',
-    });
-
     await tx.insert(children).values({
       id: MAYA_ID,
-      guardianId: GUARDIAN_ID,
+      guardianId: guardianId,
       name: 'Maya',
       birthDate: '2017-09-15',
       grade: 3,

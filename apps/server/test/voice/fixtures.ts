@@ -1,11 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../../src/db/client';
-import { children, learningProfiles, learningProfileTraits } from '../../src/db/schema';
+import { children, guardians, learningProfiles, learningProfileTraits } from '../../src/db/schema';
 
 /** A dedicated child for SP3 voice DB tests — keeps mutations off the seeded Maya. */
 export const VOICE_TEST_CHILD_ID = '00000000-0000-0000-0000-0000000000f1';
 const VOICE_TEST_PROFILE_ID = '00000000-0000-0000-0000-0000000000f2';
-const SEEDED_GUARDIAN_ID = '00000000-0000-0000-0000-0000000000a1';
 
 const INITIAL_TRAITS = [
   { traitId: 'visual', label: 'Pictures & diagrams', score: 60 },
@@ -18,6 +17,15 @@ const INITIAL_TRAITS = [
  *  Resets trait scores to their initial values each call so mutation tests start clean.
  *  Call AFTER migrateAndSeedTestDb() (which creates the seeded guardian). */
 export async function ensureVoiceTestChild(): Promise<void> {
+  // Look up the seeded guardian by email (the seed creates it via better-auth, so the id is dynamic).
+  const [guardianRow] = await db
+    .select({ id: guardians.id })
+    .from(guardians)
+    .where(eq(guardians.email, 'parent@studybuddy.dev'))
+    .limit(1);
+  if (!guardianRow) throw new Error('[fixtures] seeded guardian not found — run migrateAndSeedTestDb first');
+  const seededGuardianId = guardianRow.id;
+
   const existing = await db
     .select({ id: children.id })
     .from(children)
@@ -27,7 +35,7 @@ export async function ensureVoiceTestChild(): Promise<void> {
   if (existing.length === 0) {
     await db.insert(children).values({
       id: VOICE_TEST_CHILD_ID,
-      guardianId: SEEDED_GUARDIAN_ID,
+      guardianId: seededGuardianId,
       name: 'VoiceTester',
       birthDate: '2017-01-01',
       grade: 3,

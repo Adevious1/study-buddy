@@ -3,6 +3,7 @@ import { ensureTestDb, setDatabaseUrl, migrateAndSeedTestDb } from './setup';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: { fetch: (req: Request) => Response | Promise<Response> };
+let cookie = '';
 
 beforeAll(async () => {
   await ensureTestDb();
@@ -10,6 +11,9 @@ beforeAll(async () => {
   await migrateAndSeedTestDb();
   // Import after env is set so client.ts picks up the test URL.
   ({ app } = await import('../src/index'));
+  // Sign in as the seeded guardian so child-route requests pass ownership checks.
+  const { signInGuardian } = await import('./authHarness');
+  cookie = await signInGuardian('parent@studybuddy.dev', 'studybuddy');
 });
 
 describe('GET /healthz', () => {
@@ -32,7 +36,9 @@ describe('child context middleware', () => {
 
   it('returns 404 for an unknown childId', async () => {
     const res = await app.fetch(
-      new Request('http://test/api/children/00000000-0000-0000-0000-000000000099'),
+      new Request('http://test/api/children/00000000-0000-0000-0000-000000000099', {
+        headers: { Cookie: cookie },
+      }),
     );
     expect(res.status).toBe(404);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,7 +51,7 @@ const MAYA_ID = '00000000-0000-0000-0000-000000000001';
 
 describe('GET /api/children/:childId', () => {
   it('returns the student record with raw fields, no display strings', async () => {
-    const res = await app.fetch(new Request(`http://test/api/children/${MAYA_ID}`));
+    const res = await app.fetch(new Request(`http://test/api/children/${MAYA_ID}`, { headers: { Cookie: cookie } }));
     expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = (await res.json()) as any;
@@ -64,7 +70,7 @@ describe('GET /api/children/:childId', () => {
 describe('GET /api/children/:childId/sessions/continue', () => {
   it('returns the in-progress session as ContinueSession', async () => {
     const res = await app.fetch(
-      new Request(`http://test/api/children/${MAYA_ID}/sessions/continue`),
+      new Request(`http://test/api/children/${MAYA_ID}/sessions/continue`, { headers: { Cookie: cookie } }),
     );
     expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,7 +87,7 @@ describe('GET /api/children/:childId/sessions/continue', () => {
 describe('GET /api/children/:childId/sessions/latest/recap', () => {
   it('returns the most recently completed session recap', async () => {
     const res = await app.fetch(
-      new Request(`http://test/api/children/${MAYA_ID}/sessions/latest/recap`),
+      new Request(`http://test/api/children/${MAYA_ID}/sessions/latest/recap`, { headers: { Cookie: cookie } }),
     );
     expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,7 +105,7 @@ describe('GET /api/children/:childId/sessions/latest/recap', () => {
 describe('GET /api/children/:childId/assignments/today', () => {
   it("returns today's assignments as raw Assignment[]", async () => {
     const res = await app.fetch(
-      new Request(`http://test/api/children/${MAYA_ID}/assignments/today`),
+      new Request(`http://test/api/children/${MAYA_ID}/assignments/today`, { headers: { Cookie: cookie } }),
     );
     expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,7 +126,7 @@ describe('GET /api/children/:childId/assignments/today', () => {
 describe('GET /api/children/:childId/subjects', () => {
   it('returns the active subject mix with topics', async () => {
     const res = await app.fetch(
-      new Request(`http://test/api/children/${MAYA_ID}/subjects`),
+      new Request(`http://test/api/children/${MAYA_ID}/subjects`, { headers: { Cookie: cookie } }),
     );
     expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -140,7 +146,7 @@ describe('GET /api/children/:childId/subjects', () => {
 describe('GET /api/children/:childId/learning-profile', () => {
   it('returns the learning profile with traits as raw rows', async () => {
     const res = await app.fetch(
-      new Request(`http://test/api/children/${MAYA_ID}/learning-profile`),
+      new Request(`http://test/api/children/${MAYA_ID}/learning-profile`, { headers: { Cookie: cookie } }),
     );
     expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,7 +169,7 @@ describe('GET /api/children/:childId/learning-profile', () => {
 describe('GET /api/children/:childId/activity?range=week', () => {
   it('derives the week activity with 7 bars and raw seconds', async () => {
     const res = await app.fetch(
-      new Request(`http://test/api/children/${MAYA_ID}/activity?range=week`),
+      new Request(`http://test/api/children/${MAYA_ID}/activity?range=week`, { headers: { Cookie: cookie } }),
     );
     expect(res.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
