@@ -15,6 +15,13 @@
       "when": 1780188582768,
       "tag": "0001_shallow_rafael_vega",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780202748351,
+      "tag": "0002_brave_khan",
+      "breakpoints": true
     }
   ]
 }

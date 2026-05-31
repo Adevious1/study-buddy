@@ -71,6 +71,18 @@ export const guardians = pgTable('guardians', {
   ...timestamps,
 });
 
+export const subscriptions = pgTable('subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  guardianId: uuid('guardian_id').notNull().unique().references(() => guardians.id, { onDelete: 'cascade' }),
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }).notNull(),
+  stripeCustomerId: text('stripe_customer_id'),
+  stripeSubscriptionId: text('stripe_subscription_id'),
+  status: text('status'),
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+  seats: integer('seats').notNull().default(0),
+  ...timestamps,
+});
+
 export const children = pgTable(
   'children',
   {
