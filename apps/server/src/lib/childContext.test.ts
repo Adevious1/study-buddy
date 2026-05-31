@@ -43,4 +43,18 @@ describe('childContext ownership', () => {
     const res = await app.request(`/api/children/not-a-uuid`, { headers: { Cookie: ownerCookie } });
     expect(res.status).toBe(400);
   });
+  // Deep (sub-route) ownership: childContext is registered on `/children/:childId/*`,
+  // so a non-owner must be blocked on nested routes too — not just the base route.
+  it('returns 404 for a different guardian on a DEEP child route', async () => {
+    const res = await app.request(`/api/children/${ownedChildId}/assignments/today`, {
+      headers: { Cookie: otherCookie },
+    });
+    expect(res.status).toBe(404);
+  });
+  it('returns 200 for the owning guardian on a DEEP child route', async () => {
+    const res = await app.request(`/api/children/${ownedChildId}/assignments/today`, {
+      headers: { Cookie: ownerCookie },
+    });
+    expect(res.status).toBe(200);
+  });
 });

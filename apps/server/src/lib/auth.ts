@@ -16,7 +16,9 @@ if (isProd && !process.env.BETTER_AUTH_SECRET) {
 }
 
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:5173',
+  // `||` not `??`: docker-compose passes BETTER_AUTH_URL as `${BETTER_AUTH_URL:-}`,
+  // an empty string when unset — `??` would keep '' and break OAuth redirects.
+  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:5173',
   secret,
   trustedOrigins: ['http://localhost:5173', 'http://localhost:3001'],
   database: drizzleAdapter(db, {
