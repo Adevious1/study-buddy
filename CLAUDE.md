@@ -19,16 +19,23 @@ SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 live transcript, and learning-style detection via function calling committing
 bounded trait deltas at session end.
 
-Pip's behavior (persona, the Socratic rule, tone, language, off-topic handling,
-the learning-signal instruction) is **tunable via `apps/server/study-buddy.md`** —
-an editable, version-controlled markdown template with `{{token}}` placeholders for
-live per-session data (`{{childName}}`, `{{grade}}`, `{{subject}}`, `{{topic}}`,
-`{{traitLean}}`). The server reads it fresh at each session start (hot-reload via
-the `./apps/server` bind mount — edit + save, next session uses it, no restart);
-markdown headings are stripped before sending so the prompt stays byte-identical to
-the in-code `BUILTIN_TEMPLATE`, which is also the fallback if the file is
-missing/unreadable. `STUDY_BUDDY_PROMPT_PATH` overrides the path. Lives in
-`apps/server/src/voice/systemPrompt.ts`.
+Pip's behavior (persona, the discover-and-assess opening, the 9-step session
+flow, the Socratic rule, tone, language, off-topic handling, the learning-signal
+instruction) is **tunable via `apps/server/study-buddy.md`** — an editable,
+version-controlled markdown template with `{{token}}` placeholders for live
+per-session data (`{{childName}}`, `{{grade}}`, `{{subject}}`, `{{topic}}`,
+`{{intro}}`, `{{traitLean}}`). `{{intro}}` gates Pip's one-time self-introduction:
+present only on a child's first-ever session (detected by
+`countSessionsForChild === 0`), explicitly suppressed thereafter so Pip doesn't
+re-introduce itself each subject. The server reads the file fresh at each session
+start (hot-reload via the `./apps/server` bind mount — edit + save, next session
+uses it, no restart); markdown headings are stripped before sending. The in-code
+`BUILTIN_TEMPLATE` is kept **byte-identical** to the file (a test guards against
+drift) and is the fallback if the file is missing/unreadable.
+`STUDY_BUDDY_PROMPT_PATH` overrides the path. Lives in
+`apps/server/src/voice/systemPrompt.ts`. A stray leading `"Text "` artifact from
+Gemini's native-audio output transcription is stripped per-turn in
+`apps/server/src/voice/transcript.ts`.
 
 SP4 (auth): better-auth (pinned `~1.2.12` — see [[docker-node-modules-sync]]),
 guardian **Google OAuth** + a **dev-only email/password** path; `guardians` linked

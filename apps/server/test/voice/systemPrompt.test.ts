@@ -10,28 +10,6 @@ import {
 } from '../../src/voice/systemPrompt';
 import type { SystemPromptInput } from '../../src/voice/systemPrompt';
 
-// The exact string the previous hardcoded implementation produced.
-const EXPECTED_WITH_TRAIT = [
-  'You are Pip, a warm, patient, encouraging tutor for Maya, a grade 3 student.',
-  'You are helping with Math — specifically "Fractions".',
-  'SOCRATIC RULE (most important): guide with questions and small hints. NEVER state the final answer. If Maya is stuck, break the problem into one smaller step and ask again.',
-  'Maya tends to learn best through pictures; lean into that when it helps.',
-  'Always speak and listen in English (US). If Maya uses another language or you mishear, gently continue in simple English.',
-  'Speak in short, friendly, spoken sentences a young child can follow. Be cheerful and concrete.',
-  'If Maya goes off-topic or seems upset, gently steer back. Do not lecture.',
-  'When you notice Maya responding well to a way of learning — drawing/pictures = visual, stories/examples = narrative, hands-on/acting it out = kinesthetic, talking it through = auditory — call the note_learning_signal tool. Keep talking naturally and never mention the tool.',
-].join('\n');
-
-const EXPECTED_NO_TRAIT = [
-  'You are Pip, a warm, patient, encouraging tutor for Maya, a grade 3 student.',
-  'You are helping with Math — specifically "Fractions".',
-  'SOCRATIC RULE (most important): guide with questions and small hints. NEVER state the final answer. If Maya is stuck, break the problem into one smaller step and ask again.',
-  'Always speak and listen in English (US). If Maya uses another language or you mishear, gently continue in simple English.',
-  'Speak in short, friendly, spoken sentences a young child can follow. Be cheerful and concrete.',
-  'If Maya goes off-topic or seems upset, gently steer back. Do not lecture.',
-  'When you notice Maya responding well to a way of learning — drawing/pictures = visual, stories/examples = narrative, hands-on/acting it out = kinesthetic, talking it through = auditory — call the note_learning_signal tool. Keep talking naturally and never mention the tool.',
-].join('\n');
-
 const inputWithTrait: SystemPromptInput = {
   childName: 'Maya',
   grade: 3,
@@ -52,6 +30,8 @@ const inputNoTrait: SystemPromptInput = {
   firstSession: false,
   traits: [],
 };
+
+const SHIPPED_PROMPT_PATH = join(import.meta.dir, '..', '..', 'study-buddy.md');
 
 describe('renderTemplate', () => {
   it('substitutes known tokens', () => {
@@ -84,67 +64,56 @@ describe('renderTemplate', () => {
   });
 });
 
-// Run `fn` with STUDY_BUDDY_PROMPT_PATH pointed at a missing file, so
-// buildSystemInstruction/loadTemplate exercise the in-code BUILTIN_TEMPLATE
-// fallback rather than the (intentionally diverged) shipped study-buddy.md.
-async function withBuiltinFallback<T>(fn: () => Promise<T>): Promise<T> {
-  const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
-  process.env.STUDY_BUDDY_PROMPT_PATH = join(tmpdir(), 'sb-builtin-fallback-xyz.md');
-  try {
-    return await fn();
-  } finally {
-    if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
-    else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
-  }
-}
-
-describe('buildSystemInstruction (built-in template)', () => {
-  it('reproduces the previous output byte-for-byte (with a trait)', async () => {
-    const out = await withBuiltinFallback(() => buildSystemInstruction(inputWithTrait));
-    expect(out).toBe(EXPECTED_WITH_TRAIT);
+describe('buildSystemInstruction (built-in template, default path)', () => {
+  // With study-buddy.md the canonical baseline (byte-identical to BUILTIN_TEMPLATE),
+  // the default path reads the shipped file; both render the same prompt.
+  it('substitutes every token and keeps the Socratic + tool guardrails', async () => {
+    const out = await buildSystemInstruction(inputWithTrait);
+    expect(out).not.toMatch(/\{\{.*?\}\}/); // no unsubstituted placeholders
+    expect(out).toContain('Maya');
+    expect(out).toContain('grade 3');
+    expect(out).toContain('Math');
+    expect(out).toContain('Fractions');
+    expect(out).toContain('NEVER state the final answer');
+    expect(out).toContain('note_learning_signal');
   });
 
-  it('omits the learning-style line when there are no traits', async () => {
-    const out = await withBuiltinFallback(() => buildSystemInstruction(inputNoTrait));
-    expect(out).toBe(EXPECTED_NO_TRAIT);
+  it('includes the learning-style lean line when a trait is present', async () => {
+    const out = await buildSystemInstruction(inputWithTrait);
+    expect(out).toContain('Maya tends to learn best through pictures; lean into that when it helps.');
   });
-});
 
-describe('BUILTIN_TEMPLATE', () => {
-  it('contains all five tokens', () => {
-    for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{traitLean}}']) {
-      expect(BUILTIN_TEMPLATE).toContain(t);
-    }
+  it('omits the learning-style lean line when there are no traits', async () => {
+    const out = await buildSystemInstruction(inputNoTrait);
+    expect(out).not.toContain('tends to learn best through');
+    expect(out).not.toMatch(/\{\{.*?\}\}/);
+  });
+
+  it('strips markdown headings so no "##" survives into the prompt', async () => {
+    const out = await buildSystemInstruction(inputWithTrait);
+    expect(out).not.toMatch(/^#/m);
   });
 });
 
 describe('intro token (first-session gating)', () => {
-  // Render a tiny template that is just the {{intro}} token, isolating the
-  // intro behavior from the rest of the prompt.
-  async function renderIntro(firstSession: boolean): Promise<string> {
-    const p = join(tmpdir(), `sb-intro-${process.pid}.md`);
-    await writeFile(p, '{{intro}}', 'utf8');
-    const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
-    process.env.STUDY_BUDDY_PROMPT_PATH = p;
-    try {
-      return await buildSystemInstruction({ ...inputNoTrait, firstSession });
-    } finally {
-      if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
-      else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
-      await rm(p, { force: true });
-    }
-  }
-
-  it('introduces Pip on the first session', async () => {
-    const out = await renderIntro(true);
+  it('introduces Pip on the child\'s first-ever session', async () => {
+    const out = await buildSystemInstruction({ ...inputNoTrait, firstSession: true });
     expect(out).toContain('first time');
     expect(out).toContain('introduce yourself as Pip');
   });
 
   it('suppresses the self-intro on later sessions', async () => {
-    const out = await renderIntro(false);
+    const out = await buildSystemInstruction({ ...inputNoTrait, firstSession: false });
     expect(out).toContain('already knows you as Pip');
     expect(out).toContain('Do NOT introduce yourself');
+  });
+});
+
+describe('BUILTIN_TEMPLATE', () => {
+  it('contains all six tokens', () => {
+    for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{intro}}', '{{traitLean}}']) {
+      expect(BUILTIN_TEMPLATE).toContain(t);
+    }
   });
 });
 
@@ -176,35 +145,10 @@ describe('loadTemplate', () => {
     }
   });
 
-  // The shipped study-buddy.md is intentionally tuned and may diverge from the
-  // in-code BUILTIN_TEMPLATE (which stays as the safe fallback). So instead of
-  // byte-identity we assert structural invariants the file must always satisfy.
-  it('the shipped study-buddy.md is present and contains all five tokens', async () => {
-    const raw = await readFile(join(import.meta.dir, '..', '..', 'study-buddy.md'), 'utf8');
-    for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{traitLean}}']) {
-      expect(raw).toContain(t);
-    }
-  });
-
-  it('the shipped study-buddy.md renders with every token substituted', async () => {
-    const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
-    // From apps/server/test/voice/ up to apps/server/study-buddy.md
-    process.env.STUDY_BUDDY_PROMPT_PATH = join(import.meta.dir, '..', '..', 'study-buddy.md');
-    try {
-      const out = await buildSystemInstruction(inputWithTrait);
-      // No unsubstituted {{...}} placeholders survive into the prompt.
-      expect(out).not.toMatch(/\{\{.*?\}\}/);
-      // Live data landed.
-      expect(out).toContain('Maya');
-      expect(out).toContain('Math');
-      expect(out).toContain('Fractions');
-      // The non-negotiable Socratic guardrail and the learning-signal tool
-      // instruction must always be present, however the file is tuned.
-      expect(out).toContain('NEVER state the final answer');
-      expect(out).toContain('note_learning_signal');
-    } finally {
-      if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
-      else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
-    }
+  it('the shipped study-buddy.md is the canonical baseline: byte-identical to BUILTIN_TEMPLATE', async () => {
+    // study-buddy.md is the editable copy; BUILTIN_TEMPLATE is its in-code mirror
+    // and fallback. They must stay in lockstep — this guard fails loudly on drift.
+    const raw = await readFile(SHIPPED_PROMPT_PATH, 'utf8');
+    expect(raw).toBe(BUILTIN_TEMPLATE);
   });
 });
