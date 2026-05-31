@@ -27,6 +27,15 @@ describe('GET /api/me', () => {
     expect(typeof body.guardian.email).toBe('string');
     expect(typeof body.guardian.name).toBe('string');
   });
+
+  it('includes an entitlement summary; a fresh guardian is entitled (trial)', async () => {
+    const { cookie } = await makeGuardian(`ent-${Date.now()}@test.dev`);
+    const res = await app.request('/api/me', { headers: { Cookie: cookie } });
+    const body = await res.json() as MeResponse;
+    expect(body.entitlement.entitled).toBe(true);
+    expect(typeof body.entitlement.trialEndsAt).toBe('string');
+    expect(body.entitlement.status).toBeNull();
+  });
 });
 
 describe('POST /api/me/children', () => {

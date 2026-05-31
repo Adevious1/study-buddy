@@ -86,6 +86,15 @@ export interface RecapResult {
 
 // --- Auth / API contracts ---
 
+export type BillingStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid' | 'incomplete';
+
+export interface Entitlement {
+  entitled: boolean;
+  status: BillingStatus | null;
+  trialEndsAt: string;            // ISO
+  currentPeriodEnd: string | null;
+}
+
 export interface ChildProfileSummary {
   id: string;
   name: string;
@@ -97,6 +106,7 @@ export interface MeResponse {
   guardian: { id: string; email: string; name: string };
   children: ChildProfileSummary[];
   hasPin: boolean;
+  entitlement: Entitlement;
 }
 
 export interface CreateChildInput {

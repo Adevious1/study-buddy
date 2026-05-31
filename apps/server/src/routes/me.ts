@@ -6,6 +6,7 @@ import { db } from '../db/client';
 import { children, guardians } from '../db/schema';
 import { guardianContext, type GuardianVariables } from '../lib/guardianContext';
 import { isLocked, recordFail, clearFails } from '../lib/pinLockout';
+import { getEntitlement } from '../lib/billing';
 import type { MeResponse } from '@study-buddy/shared';
 
 export const meRoute = new Hono<{ Variables: GuardianVariables }>();
@@ -20,10 +21,12 @@ meRoute.get('/', async (c) => {
     .select({ id: children.id, name: children.name, grade: children.grade, pipColor: children.pipColor })
     .from(children)
     .where(eq(children.guardianId, g.id));
+  const entitlement = await getEntitlement(g.id);
   const body: MeResponse = {
     guardian: { id: g.id, email: g.email, name: g.name },
     children: rows,
     hasPin: g.pinHash != null,
+    entitlement,
   };
   return c.json(body);
 });
