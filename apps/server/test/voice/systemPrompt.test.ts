@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'bun:test';
+import { readFile, writeFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   BUILTIN_TEMPLATE,
   renderTemplate,
+  loadTemplate,
   buildSystemInstruction,
 } from '../../src/voice/systemPrompt';
 import type { SystemPromptInput } from '../../src/voice/systemPrompt';
@@ -94,6 +98,55 @@ describe('BUILTIN_TEMPLATE', () => {
   it('contains all five tokens', () => {
     for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{traitLean}}']) {
       expect(BUILTIN_TEMPLATE).toContain(t);
+    }
+  });
+});
+
+describe('loadTemplate', () => {
+  it('reads the file at STUDY_BUDDY_PROMPT_PATH', async () => {
+    const p = join(tmpdir(), `sb-prompt-${process.pid}.md`);
+    await writeFile(p, '# H\nhello {{childName}}', 'utf8');
+    const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
+    process.env.STUDY_BUDDY_PROMPT_PATH = p;
+    try {
+      const tpl = await loadTemplate();
+      expect(tpl).toBe('# H\nhello {{childName}}');
+    } finally {
+      if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
+      else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
+      await rm(p, { force: true });
+    }
+  });
+
+  it('falls back to the built-in template when the file is unreadable', async () => {
+    const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
+    process.env.STUDY_BUDDY_PROMPT_PATH = join(tmpdir(), 'sb-does-not-exist-xyz.md');
+    try {
+      const tpl = await loadTemplate();
+      expect(tpl).toBe(BUILTIN_TEMPLATE);
+    } finally {
+      if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
+      else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
+    }
+  });
+
+  it('the shipped study-buddy.md is present and matches the built-in', async () => {
+    // Fails loudly if the file is deleted or drifts from BUILTIN_TEMPLATE,
+    // rather than being silently masked by loadTemplate's fallback.
+    const raw = await readFile(join(import.meta.dir, '..', '..', 'study-buddy.md'), 'utf8');
+    expect(raw).toBe(BUILTIN_TEMPLATE);
+  });
+
+  it('the shipped study-buddy.md renders byte-identical to the built-in', async () => {
+    const prev = process.env.STUDY_BUDDY_PROMPT_PATH;
+    // From apps/server/test/voice/ up to apps/server/study-buddy.md
+    process.env.STUDY_BUDDY_PROMPT_PATH = join(import.meta.dir, '..', '..', 'study-buddy.md');
+    try {
+      const out = await buildSystemInstruction(inputWithTrait);
+      expect(out).toBe(EXPECTED_WITH_TRAIT);
+    } finally {
+      if (prev === undefined) delete process.env.STUDY_BUDDY_PROMPT_PATH;
+      else process.env.STUDY_BUDDY_PROMPT_PATH = prev;
     }
   });
 });
