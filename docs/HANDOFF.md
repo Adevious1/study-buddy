@@ -5,9 +5,9 @@
 
 ## Current state (2026-05-31)
 
-**SP1–SP5 all built and on `main`.** `main` is the only branch and is in sync with
-origin (`github.com:Adevious1/study-buddy`). pnpm monorepo; everything runs in
-Docker. HEAD: `4a7e24b`.
+**SP1–SP5 all built and on `main`.** SP6 (session recap) is implemented on the
+`sp6-session-recap` branch — awaiting the live mic smoke (`SP6-manual-smoke.md`)
+before merge. pnpm monorepo; everything runs in Docker. HEAD: `4a7e24b`.
 
 (See `CLAUDE.md` for the authoritative status block and architecture.)
 
@@ -25,6 +25,13 @@ Docker. HEAD: `4a7e24b`.
 - **SP5 billing** — Stripe seat-based subs, trial, webhook, entitlement gating.
   Code on `main`. 🟡 partial (live Stripe payment click-through tabled — needs test
   creds + Stripe CLI).
+- **SP6 session recap** — post-session Gemini summary (`gemini-3-flash-preview`)
+  into the existing recap UI; transcript persistence (`sessions.transcript` jsonb);
+  tunable `study-buddy-recap.md` prompt (hot-reload + drift-guard, mirrors SP3
+  pattern); generate-then-reveal UX (wrapping-up screen → `/app/recap`); timeout-
+  bounded generation with graceful fallback; abandoned sessions persist transcript
+  but get no recap. Code on `sp6-session-recap`. 🟡 pending human mic smoke
+  (`SP6-manual-smoke.md`).
 
 ## Pip's voice behavior is now tunable (SP3)
 
@@ -58,11 +65,12 @@ stripped in `apps/server/src/voice/transcript.ts`.
 
 ## Suggested next steps
 
-- The deferred **Pip session-recap** product feature (auto-generated child-facing
-  recap after a session) — needs its own brainstorm → spec → plan → build.
-- Transcript persistence (transcripts are currently not stored).
+- **SP6 live mic smoke** — run `SP6-manual-smoke.md` (happy path, DB check, tunable
+  prompt, fallback, abandoned path), then merge `sp6-session-recap` to `main`.
 - Live Stripe payment smoke (needs Stripe test creds + Stripe CLI).
 - Full Google OAuth completion + fresh-guardian onboarding (needs real creds).
+- Remaining deferred items: LLM-written profile notes, hint chips, subjectless
+  free-talk, mid-session seamless reconnect.
 
 ## Latest session recap
 
