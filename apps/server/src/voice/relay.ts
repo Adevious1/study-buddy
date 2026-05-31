@@ -127,25 +127,30 @@ export function createRelay(opts: RelayOptions) {
     if (capTimer) { clearTimeout(capTimer); capTimer = null; }
     try { await session?.close(); } catch { /* ignore */ }
     const turns = transcript.turns();
-    if (sessionRowId) {
-      if (finalState === 'completed') {
-        const recap = await generateRecap(
-          {
-            turns,
-            childName,
-            grade: childGrade,
-            subjectKind: meta?.subjectKind ?? 'math',
-            topic: meta?.topic ?? '',
-          },
-          opts.recapGenerator ?? null,
-        );
-        await finalizeLiveSession(sessionRowId, 'completed', { transcript: turns, recap });
-        await commitLearningProfile(childId, signals.all());
-      } else {
-        await finalizeLiveSession(sessionRowId, 'abandoned', { transcript: turns });
+    try {
+      if (sessionRowId) {
+        if (finalState === 'completed') {
+          const recap = await generateRecap(
+            {
+              turns,
+              childName,
+              grade: childGrade,
+              subjectKind: meta?.subjectKind ?? 'math',
+              topic: meta?.topic ?? '',
+            },
+            opts.recapGenerator ?? null,
+          );
+          await finalizeLiveSession(sessionRowId, 'completed', { transcript: turns, recap });
+          await commitLearningProfile(childId, signals.all());
+        } else {
+          await finalizeLiveSession(sessionRowId, 'abandoned', { transcript: turns });
+        }
       }
+    } finally {
+      // Always tell the client the session ended, even if a DB write failed —
+      // the browser's wrapping-up screen waits for this to navigate to the recap.
+      sink.sendControl({ type: 'status', state: 'ended' });
     }
-    sink.sendControl({ type: 'status', state: 'ended' });
   }
 
   return {
