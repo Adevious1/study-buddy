@@ -53,6 +53,10 @@ async function main(opts: { closeConnection?: boolean } = {}) {
   if (!seedGuardian) throw new Error('[seed] guardian row not created by auth hook');
   const guardianId = seedGuardian.id;
 
+  // Give the seed guardian a known dev dashboard PIN ('1234') so the PIN-gated
+  // dashboard is reachable via the dev seed login without running onboarding.
+  await db.update(guardians).set({ pinHash: await Bun.password.hash('1234') }).where(eq(guardians.id, guardianId));
+
   const now = new Date();
 
   // Completed sessions anchored *backwards* from now, so every one is always in

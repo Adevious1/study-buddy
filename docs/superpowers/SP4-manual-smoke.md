@@ -47,9 +47,12 @@ this checklist covers the end-to-end browser flow.
    active and returns to `/app`. Pick the other child → `/app` reflects the switch
    (greeting + data change; react-query refetches on the new active child id).
 5. **Dashboard PIN gate** — visit `http://localhost:5173/dashboard`:
+   - The dev seed guardian has a known PIN **`1234`** (set by the seed). A guardian
+     created via the Google/onboarding path uses the PIN they chose in onboarding.
    - Wrong PIN → "Wrong PIN." (shake/clear). Five wrong tries → **"Too many tries"** (429
      lockout, ~60s).
-   - Correct PIN → the **dashboard** renders (15-min unlock cookie).
+   - Correct PIN (`1234` for the seed guardian) → the **dashboard** renders (15-min
+     unlock cookie).
 6. **Voice still works under auth** — `/app/voice` (or the Home Continue card) → confirm
    the live Pip audio session connects and responds. The session cookie rides the WS
    upgrade; the relay is reachable only for the signed-in guardian's child.
