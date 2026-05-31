@@ -41,13 +41,22 @@ version change. Accepted limitations (webhook event ordering/dedup; seat-sync
 partial state) are documented in the smoke doc.
 
 The screens, the live audio loop, the auth flow, and the billing flow all require
-a browser (and, for Google/Stripe, real creds); none is smoke-tested in CI. See
-`docs/superpowers/SP1-manual-smoke.md` (the six screens + dashboard),
-`docs/superpowers/SP3-manual-smoke.md`, `docs/superpowers/SP4-manual-smoke.md`,
-and `docs/superpowers/SP5-manual-smoke.md`. The backend/DB infra smoke (health,
-schema, migrations, seed, API auth-gating — `curl` + `psql`, not a browser) is
-`docs/superpowers/SP2-manual-smoke.md`. Dev seed login:
-`parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
+a browser (and, for Google/Stripe, real creds); none is smoke-tested in CI. Each
+subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-05-31:
+
+- `SP1-manual-smoke.md` (six screens + dashboard) — ✅ **verified** via Playwright.
+- `SP2-manual-smoke.md` (backend/DB infra: health, schema, migrations, seed, API
+  auth-gating — `curl` + `psql`, not a browser) — ✅ **verified** against the live stack.
+- `SP3-manual-smoke.md` (live voice loop) — ⏸️ **not run**: needs a mic + real
+  `GEMINI_API_KEY` (the Voice screen shell renders; the audio loop is unexercised).
+- `SP4-manual-smoke.md` (auth) — ✅ **verified (dev path)**: IDOR, add-child, PIN
+  lockout, sign-out/re-gate. Google OAuth completion + fresh-guardian onboarding
+  still uncovered (need real OAuth creds / a new guardian).
+- `SP5-manual-smoke.md` (billing) — 🟡 **partial**: trial/banner/gates (402 + client
+  `/app`→`/subscribe`) verified; the live Stripe Checkout/Portal payment flow is
+  tabled (needs Stripe test creds + the Stripe CLI — see [[sp5-stripe-live-smoke-pending]]).
+
+Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
 **Deferred to a later effort:** auto-generated session recap, transcript
 persistence, LLM-written profile notes, interactive hint chips, true subjectless
