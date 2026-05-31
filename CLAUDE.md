@@ -10,15 +10,26 @@ The design spec lives in `docs/superpowers/specs/`.
 
 ## Status
 
-**SP1 (UI foundation) and SP2 (backend + database) are done.
-SP3 (live voice tutor) is implemented** — browser ⇄ Hono WS relay ⇄ Gemini Live
+**SP1 (UI), SP2 (backend + database), SP3 (live voice tutor), and SP4 (auth) are
+done and merged to `main`. SP5 (billing) is next.**
+
+SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
 live transcript, and learning-style detection via function calling committing
 bounded trait deltas at session end.
 
-The live audio loop requires a real `GEMINI_API_KEY` and a browser; it has NOT
-been smoke-tested in CI. See `docs/superpowers/SP3-manual-smoke.md` for the
-checklist.
+SP4 (auth): better-auth (pinned `~1.2.12` — see [[docker-node-modules-sync]]),
+guardian **Google OAuth** + a **dev-only email/password** path; `guardians` linked
+1:1 to better-auth's `user` via `userId`; a runtime child-profile switcher
+(`ChildProfileContext`) replacing the old build-time `VITE_CURRENT_CHILD_ID`;
+login / onboarding (PIN → add child) / profile-picker / PIN-gated-dashboard
+screens; and **guardian-ownership authz in `childContext`** (the IDOR fix —
+unowned child → 404, no session → 401), which also protects the voice WS route.
+
+The live audio loop and the auth flow both require a browser (and, for Google,
+real OAuth creds); neither is smoke-tested in CI. See
+`docs/superpowers/SP3-manual-smoke.md` and `docs/superpowers/SP4-manual-smoke.md`.
+Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
 **Deferred to a later effort:** auto-generated session recap, transcript
 persistence, LLM-written profile notes, interactive hint chips, true subjectless
@@ -39,7 +50,7 @@ the seamless resumption reconnect is the remaining seam).
 | Live API auth | full backend relay: browser ⇄ our Hono WS server ⇄ Gemini (API key stays server-side) |
 | Database | Postgres + Drizzle ORM |
 | Accounts | guardian account (**Google sign-in**) → multiple child profiles |
-| Auth method | **Google OAuth** for the guardian (likely via `better-auth`'s Google provider — confirm in SP4) |
+| Auth method | **Google OAuth** for the guardian via `better-auth`'s Google provider (SP4 ✓); dev-only email/password for the seed login. Dashboard behind a guardian PIN. |
 | Billing | per-child-profile (seat-based) subscription |
 | Repo | pnpm monorepo |
 | Deployment | **everything in Docker** — `docker-compose` runs web + Hono server + Postgres |
@@ -59,8 +70,10 @@ implementation cycle. **Do not collapse these into one effort.**
    learning-style detection via function calling writing bounded trait deltas.
    Deferred items: session recap, transcript persistence, LLM profile notes,
    hint chips, subjectless free-talk, and mid-session seamless reconnect.
-4. **Auth** — `better-auth`, guardian sign-up/login, child-profile switcher, new
-   onboarding screens; gates the app.
+4. **Auth** ✓ _done_ — `better-auth` (Google OAuth + dev email/password), guardian
+   login, runtime child-profile switcher (replaced `VITE_CURRENT_CHILD_ID`),
+   onboarding/login/picker/PIN-gate screens, and guardian-ownership authz in
+   `childContext` (IDOR fix). Gates `/app/*` and `/dashboard`.
 5. **Billing** — seat-based subscription + paywall on adding a child.
 
 ## Planned layout (pnpm monorepo)
