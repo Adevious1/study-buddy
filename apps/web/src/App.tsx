@@ -12,6 +12,7 @@ import { OnboardingRoute } from './routes/onboarding/OnboardingRoute';
 import { SwitchRoute } from './routes/onboarding/SwitchRoute';
 import { RequireGuardian } from './routes/auth/RequireGuardian';
 import { RequireDashboardPin } from './routes/auth/RequireDashboardPin';
+import { SubscribeRoute } from './routes/billing/SubscribeRoute';
 
 export default function App() {
   return (
@@ -33,6 +34,14 @@ export default function App() {
             element={
               <RequireGuardian>
                 <SwitchRoute />
+              </RequireGuardian>
+            }
+          />
+          <Route
+            path="/subscribe"
+            element={
+              <RequireGuardian>
+                <SubscribeRoute />
               </RequireGuardian>
             }
           />
