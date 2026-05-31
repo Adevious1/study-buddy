@@ -1,175 +1,69 @@
 # Study Buddy — Session Handoff
 
-_Last updated: 2026-05-24_
+> Living doc. Update at the end of each working session so the next context can
+> resume fast. Keep it short; link to specs/plans/smoke docs for detail.
 
-> **Resume here:** Sub-project 1 (UI foundation) is **done and merged to `main`**.
-> The next step is to **brainstorm Sub-project 2 (backend + database)**. Start a new
-> session and say: _"Let's brainstorm Sub-project 2 (backend + database)."_ Read
-> `CLAUDE.md` first (committed decisions + roadmap); this file adds the temporal
-> context and the open questions waiting for each upcoming sub-project.
+## Current state (2026-05-31)
 
----
+**SP1–SP5 all built and on `main`.** `main` is the only branch and is in sync with
+origin (`github.com:Adevious1/study-buddy`). pnpm monorepo; everything runs in
+Docker. HEAD: `4a7e24b`.
 
-## What Study Buddy is
+(See `CLAUDE.md` for the authoritative status block and architecture.)
 
-A voice-led tutor for **K-5 students**, anchored on a mascot named **Pip**. Students
-talk to Pip about assignments; Pip guides them to answers **Socratically (guides,
-never just gives the answer)** and adapts to each student's learning style over time.
-Targets web, iOS, and Android. Originated from a Claude Design HTML/CSS/JS prototype
-handoff (vendored at `docs/design-reference/`).
+## What's done
 
----
+- **SP1 UI** — six screens + dashboard, design system, Pip. ✅ verified (Playwright).
+- **SP2 backend/DB** — Hono server, Postgres + Drizzle, repository seam. ✅ verified.
+- **SP3 live voice** — mic capture/playback, WS relay to Gemini Live, Socratic
+  prompt, live transcript, learning-style function-calling. ✅ **verified via a
+  human mic run (2026-05-31)** — full audio loop confirmed end to end; End/Back are
+  responsive while "Connecting…".
+- **SP4 auth** — better-auth (Google OAuth + dev email/password), guardian login,
+  child-profile switcher, onboarding/PIN screens, IDOR fix. ✅ verified (dev path);
+  real Google OAuth completion still uncovered.
+- **SP5 billing** — Stripe seat-based subs, trial, webhook, entitlement gating.
+  Code on `main`. 🟡 partial (live Stripe payment click-through tabled — needs test
+  creds + Stripe CLI).
 
-## Session summary (2026-05-24)
+## Pip's voice behavior is now tunable (SP3)
 
-1. **Fetched + read the design bundle** (a Claude Design handoff): README, chat
-   transcript, and all source files. Identified that the prototype's design-canvas,
-   tweaks-panel, and iOS/Android/browser device frames are throwaway presentation
-   chrome — the real product is the design tokens, the Pip mascot, the shared atoms,
-   and six screens.
-2. **Brainstormed the product** (interview, one question at a time). Established that
-   this is not one project but **five interlocking subsystems**, and decomposed it.
-3. **Wrote + approved the spec** for Sub-project 1 (UI foundation):
-   `docs/superpowers/specs/2026-05-24-study-buddy-ui-foundation-design.md`.
-4. **Wrote the implementation plan** (15 bite-sized tasks):
-   `docs/superpowers/plans/2026-05-24-study-buddy-ui-foundation.md`, and vendored the
-   prototype as the port reference at `docs/design-reference/`.
-5. **Built SP1 via subagent-driven development** — 10 implementer dispatches, each
-   gated by a spec-compliance review then a code-quality review, plus a final
-   whole-implementation review. Fixed every real finding (fixed-accent-rule leaks on
-   Profile/Library/Voice, button accessibility, a dead data-load on the dashboard);
-   reasoned through and kept faithful-port non-issues.
-6. **Merged SP1 to `main`** (`finishing-a-development-branch`). `main` was unborn, so
-   it now holds the work; the feature branch is deleted.
-7. **Captured later-subsystem decisions** in `CLAUDE.md`: backend = **Hono**, auth =
-   **Google OAuth** (guardian), deployment = **everything in Docker**.
+Pip's voice system prompt lives in **`apps/server/study-buddy.md`** — an editable,
+hot-reloaded markdown template with `{{token}}` placeholders (`{{childName}}`,
+`{{grade}}`, `{{subject}}`, `{{topic}}`, `{{intro}}`, `{{traitLean}}`). Edit + save
+→ next session uses it, no restart (server bind-mounts `./apps/server`). The
+in-code `BUILTIN_TEMPLATE` in `apps/server/src/voice/systemPrompt.ts` is the
+**byte-identical** fallback (a drift-guard test enforces lockstep — update BOTH
+together). `{{intro}}` is gated to a child's first-ever session
+(`countSessionsForChild`). A stray `"Text "` Gemini transcription artifact is
+stripped in `apps/server/src/voice/transcript.ts`.
 
----
+## Environment quirks (carry forward)
 
-## Current state: Sub-project 1 — COMPLETE ✅
+- `docker` is at `/usr/local/bin` — `export PATH="/usr/local/bin:$PATH"`. macOS, no `timeout`.
+- Server tests run on the host vs a throwaway Postgres on **5433**
+  (`PG_TEST_HOST=localhost PG_TEST_PORT=5433 bun test` in `apps/server`; start
+  `sb-test-pg` if stopped). Full suite is ~83 tests.
+- Server typecheck: `cd apps/server && bun run typecheck`. Web:
+  `pnpm --filter @study-buddy/web typecheck|build`.
+- Studybuddy stack Postgres collides with a local PG on 5432; reach the stack DB
+  via `docker compose exec -T postgres psql -U studybuddy -d studybuddy`.
+- After web/prompt changes, `docker compose restart server` (or `web`) and confirm
+  the served file inside the container; the dev container can serve stale modules.
+- Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
+  Seeded child: Maya (`00000000-0000-0000-0000-000000000001`, has ~33 sessions →
+  the returning-child path; for the first-session intro path use a new child).
+- **Browser automation: use Playwright, never Claude-in-Chrome.** A real mic
+  session needs a human — Playwright can't produce real microphone audio.
 
-A runnable, faithful Study Buddy UI on mock data. pnpm monorepo:
+## Suggested next steps
 
-- `packages/shared` — domain type contracts (shared with the future server).
-- `apps/web` — React 18 + Vite + TS + Tailwind v4:
-  - **Pip** mascot (states/expressions/listening rings) + the full atom set
-    (Card, Button, HintChip, Bubble, StyleBadge, SectionTitle, icons, BottomNav,
-    Waveform, Toggle).
-  - **Six screens:** Home, Voice (visual-only), Recap, Profile, Library, Dashboard.
-  - **Two route trees:** `/app/*` (phone shell + bottom nav) and `/dashboard`
-    (desktop left-rail), with an explicit app⇄dashboard switch.
-  - **Live Pip recolor** via `PipColorContext`; brand accent held **fixed at coral**
-    everywhere (only Pip's body follows the customizable color).
-  - **Async `Repository` seam** (`apps/web/src/data`) backed by a mock implementation
-    — the single swap point for SP2's real API.
+- The deferred **Pip session-recap** product feature (auto-generated child-facing
+  recap after a session) — needs its own brainstorm → spec → plan → build.
+- Transcript persistence (transcripts are currently not stored).
+- Live Stripe payment smoke (needs Stripe test creds + Stripe CLI).
+- Full Google OAuth completion + fresh-guardian onboarding (needs real creds).
 
-Verification (green): `pnpm -r typecheck` and `pnpm --filter @study-buddy/web build`.
-No automated test suite in this slice (approved decision — manual/build verification).
+## Latest session recap
 
-### Run it
-```bash
-pnpm install
-pnpm dev        # → http://localhost:5173  (redirects to /app)
-```
-
----
-
-## Committed architecture decisions
-
-(Authoritative copy lives in `CLAUDE.md`.)
-
-| Area | Decision |
-|---|---|
-| Frontend | React 18 + Vite + TypeScript (strict) |
-| Styling | Tailwind v4 — design tokens ARE the theme |
-| Routing | react-router; `/app/*` (phone) + `/dashboard` (desktop) |
-| Fonts | self-hosted `@fontsource` (Bricolage Grotesque / Nunito / JetBrains Mono) |
-| Backend | **Hono** (TypeScript) — HTTP/API + Gemini Live WS relay |
-| Voice / AI | **Gemini Live API** (`gemini-3.1-flash-live-preview`), real-time audio |
-| Live API auth | full backend relay: browser ⇄ Hono WS server ⇄ Gemini (key server-side) |
-| Database | Postgres + Drizzle ORM |
-| Accounts | guardian account (**Google sign-in**) → multiple child profiles |
-| Auth method | **Google OAuth** (likely `better-auth` Google provider — confirm SP4) |
-| Billing | per-child-profile (seat-based) subscription |
-| Repo | pnpm monorepo |
-| Deployment | **everything in Docker** — compose: web + Hono server + Postgres |
-
----
-
-## Roadmap ahead
-
-Built in order; each is independently demoable and gets its **own** brainstorm → spec
-→ plan → subagent-driven build cycle. **Do not collapse these into one effort.**
-
-### SP2 — Backend + database  ← NEXT
-TS **Hono** server (`apps/server`), Postgres + Drizzle schema (guardians, children,
-sessions, learning_profiles, plans), and a `docker-compose` bringing up the full
-stack. The web app's mock `Repository` is swapped for a real Hono API implementation
-(one-line change in `apps/web/src/data/index.ts`).
-**Open design questions for the SP2 brainstorm:**
-- **Server runtime + WS adapter:** Node (`@hono/node-server` + `@hono/node-ws`) vs.
-  **Bun** (native WS). Drives how the Gemini Live relay holds two live sockets, and
-  pairs with the "everything in Docker" decision.
-- Drizzle schema shape + migrations; seed data (port the SP1 fixtures into a seed).
-- API surface (REST endpoints mapping to the `Repository` methods) + how the client
-  fetches (introduce React Query, or keep `useResource`).
-- `docker-compose` topology + Dockerfiles for `apps/web` and `apps/server`.
-- Refine the SP1 domain contracts where SP2 needs real fields (e.g. `Student.age`/
-  `grade` instead of the display-only `ageLabel`; tuple/length types) — these were
-  deliberately deferred from SP1.
-
-### SP3 — Live voice tutor (the hero)
-Mic capture + audio playback in the client; the Hono **WebSocket relay** to Gemini
-Live; the Socratic "guide-don't-tell" system prompt; live transcript; session
-lifecycle; learning-style detection (function calling) writing profile deltas to the
-DB. **Use the `gemini-live-api-dev` skill** for current model specs/config. The
-visual-only Voice screen from SP1 becomes real here.
-
-### SP4 — Auth
-**Google OAuth** guardian sign-in (lean: `better-auth` Google provider), child-profile
-management + a "who's learning?" switcher, and the onboarding screens (new — not in
-the original design). Gates the app. The `better-auth-engineer` agent can help.
-
-### SP5 — Billing
-Seat-based subscription (one base price + per-additional-child), and a paywall when a
-guardian adds another child.
-
----
-
-## How we work (process to follow each sub-project)
-
-1. **Brainstorm** (`superpowers:brainstorming`) — interview one question at a time;
-   present a design; get approval. The user wants this **even when requirements seem
-   clear**.
-2. **Spec** → `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, committed.
-3. **Plan** (`superpowers:writing-plans`) → `docs/superpowers/plans/...`, bite-sized
-   tasks with exact code + verification.
-4. **Build** (`superpowers:subagent-driven-development`) — fresh implementer subagent
-   per task, then spec-compliance review, then code-quality review; fix findings;
-   final whole-implementation review.
-5. **Finish** (`superpowers:finishing-a-development-branch`) — start each sub-project
-   on its own feature branch; merge to `main` when green.
-
-Verify before claiming done: run typecheck/build (and tests once they exist); report
-real output. Verify library APIs against current docs (context7) — don't assume.
-
----
-
-## Key files / pointers
-
-- `CLAUDE.md` — committed decisions + roadmap (read first in a new session).
-- `docs/superpowers/specs/2026-05-24-study-buddy-ui-foundation-design.md` — SP1 spec.
-- `docs/superpowers/plans/2026-05-24-study-buddy-ui-foundation.md` — SP1 plan.
-- `docs/design-reference/` — the vendored prototype (exact values to port from).
-- `apps/web/README.md` — how to run the web app + the route trees + the data seam.
-- `apps/web/src/data/` — the `Repository` seam (mock now; SP2 swaps it).
-- `packages/shared/src/domain.ts` — the domain contracts shared client↔server.
-
-## Known minor deferrals (noted during SP1 reviews; not blocking)
-- `Student.ageLabel` / `ContinueSession.progressLabel` are display strings; raw
-  `age`/`grade` etc. get designed against the real schema in SP2.
-- `Student.pipColor` fixture field isn't yet wired to seed the initial Pip color
-  (provider mounts above the data layer); wire or drop in SP2.
-- `WeekActivity.bars` / `doneDays` are `number[]` (could be fixed-length tuples).
-- Dashboard "My sessions" rail item routes to `/app` (no sessions screen exists yet).
-- `PipExpression` includes an unused `'star'` variant (spec-listed; renders as happy).
+`docs/superpowers/sessions/2026-05-31-tunable-pip-and-sp3-live-verify.md`
