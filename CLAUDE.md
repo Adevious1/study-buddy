@@ -47,8 +47,12 @@ subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-05
 - `SP1-manual-smoke.md` (six screens + dashboard) — ✅ **verified** via Playwright.
 - `SP2-manual-smoke.md` (backend/DB infra: health, schema, migrations, seed, API
   auth-gating — `curl` + `psql`, not a browser) — ✅ **verified** against the live stack.
-- `SP3-manual-smoke.md` (live voice loop) — ⏸️ **not run**: needs a mic + real
-  `GEMINI_API_KEY` (the Voice screen shell renders; the audio loop is unexercised).
+- `SP3-manual-smoke.md` (live voice loop) — 🟡 **partial**: connection scaffolding +
+  config verified; the audio loop still needs a mic + real `GEMINI_API_KEY`. Three
+  transcript/layout bugs were found and fixed (delta-accumulation so bubbles show full
+  sentences; Pip shrinks/transcript fills the screen; phone-frame viewport cap so the
+  transcript scrolls and controls stay pinned) — fixes verified by unit test + geometry
+  probe, awaiting visual confirmation in the human mic run.
 - `SP4-manual-smoke.md` (auth) — ✅ **verified (dev path)**: IDOR, add-child, PIN
   lockout, sign-out/re-gate. Google OAuth completion + fresh-guardian onboarding
   still uncovered (need real OAuth creds / a new guardian).
