@@ -1,11 +1,32 @@
 # SP3 Manual Smoke Checklist — Live Voice Tutor
 
-> **PARTIALLY VERIFIED (2026-05-31).** The connection scaffolding + config are
-> healthy; the audio loop is still unverified because it needs a real microphone.
-> A human must complete the mic-dependent items locally before declaring SP3 fully
-> verified. See "Partial verification" below for what's already confirmed.
+> **VERIFIED (2026-05-31)** via a human mic run against the live Docker stack.
+> The full audio loop works end to end — browser ⇄ Hono WS relay ⇄ Gemini Live,
+> real speech in and out, live transcript. The behavior fixes below were confirmed
+> live, and the previously open End/Back-while-"Connecting…" question is resolved
+> (responsive — not a bug). The original Playwright-only "partial" notes are kept
+> below for history. Remaining unverified items are the long-tail ones (soft cap,
+> mid-session reconnect) called out at the end.
 
-## Partial verification (2026-05-31, via Playwright — no microphone)
+## Live mic run (2026-05-31) — confirmed by a human
+
+Driven by a human in their own Chrome against the live stack (dev seed guardian,
+child Maya — who has prior sessions, so the returning-child path). Transcripts are
+not persisted, so these were confirmed by the human watching the on-screen
+transcript; the server-side session row creation corroborates that the WS + relay
++ Gemini connect succeeded.
+
+| Check | Result |
+|---|---|
+| WS upgrade + relay + Gemini connect (session row created `in_progress`) | ✅ |
+| Real speech in → Pip replies with audio | ✅ |
+| Live transcript shows child + Pip turns | ✅ |
+| **No re-introduction** each subject (first-session-gated `{{intro}}`) | ✅ greets by name, no "I'm Pip" |
+| **No stray `"Text "` prefix** on Pip's bubbles | ✅ gone |
+| Discover-and-assess **session flow** (asks what you're learning / what you know / guides with questions) | ✅ followed |
+| **End/Back responsive while "Connecting…"** (previously open question) | ✅ responsive — not a bug |
+
+## Partial verification (2026-05-31, via Playwright — no microphone) — superseded by the live run above
 
 Driven against the live Docker stack signed in as the dev seed guardian. The
 automated browser has no working mic, so `getUserMedia({audio:true})` **hangs**
@@ -25,11 +46,9 @@ key is not the blocker — only the mic is).
 | WS upgrade `GET /api/children/:id/voice` | ❌ never sent (client blocked on mic await) — **unverified** |
 | Audio in/out, transcript, barge-in, Socratic, profile commit, soft cap | ❌ **unverified** (all mic-dependent) |
 
-> **Open question for the human run:** from the stuck "Connecting…" state (mic
-> never resolved), neither **End** nor **Back** navigated away. Couldn't tell if
-> that's a real bug (controls inert until connected) or an artifact of the mic
-> hang. **Verify End/Back are responsive while still connecting** during the real
-> run; if they're dead, that's a bug to file.
+> **Open question — RESOLVED in the live run (2026-05-31):** End/Back **are**
+> responsive while still "Connecting…". The earlier inertness was an artifact of
+> the Playwright mic hang, not a real bug.
 
 ## Transcript fixes (2026-05-31) — verify these during the live run
 

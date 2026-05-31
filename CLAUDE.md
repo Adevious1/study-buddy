@@ -65,12 +65,15 @@ subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-05
 - `SP1-manual-smoke.md` (six screens + dashboard) — ✅ **verified** via Playwright.
 - `SP2-manual-smoke.md` (backend/DB infra: health, schema, migrations, seed, API
   auth-gating — `curl` + `psql`, not a browser) — ✅ **verified** against the live stack.
-- `SP3-manual-smoke.md` (live voice loop) — 🟡 **partial**: connection scaffolding +
-  config verified; the audio loop still needs a mic + real `GEMINI_API_KEY`. Three
-  transcript/layout bugs were found and fixed (delta-accumulation so bubbles show full
-  sentences; Pip shrinks/transcript fills the screen; phone-frame viewport cap so the
-  transcript scrolls and controls stay pinned) — fixes verified by unit test + geometry
-  probe, awaiting visual confirmation in the human mic run.
+- `SP3-manual-smoke.md` (live voice loop) — ✅ **verified** via a human mic run
+  (2026-05-31). The full audio loop works end to end (browser ⇄ Hono WS ⇄ Gemini
+  Live, real speech in/out, live transcript). Confirmed in that run: Pip no longer
+  re-introduces itself each subject (first-session-gated `{{intro}}`); the stray
+  `"Text "` transcript artifact is stripped; Pip follows the discover-and-assess
+  session flow; and **End/Back are responsive while still "Connecting…"** (the
+  previously open question — resolved, not a bug). The earlier transcript/layout
+  fixes (delta-accumulation, Pip shrinks/transcript fills, phone-frame viewport
+  cap) also held up visually.
 - `SP4-manual-smoke.md` (auth) — ✅ **verified (dev path)**: IDOR, add-child, PIN
   lockout, sign-out/re-gate. Google OAuth completion + fresh-guardian onboarding
   still uncovered (need real OAuth creds / a new guardian).
