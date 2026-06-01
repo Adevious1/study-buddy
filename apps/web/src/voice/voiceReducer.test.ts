@@ -64,3 +64,22 @@ describe('ending (wrapping-up) state', () => {
     expect(next.status).toBe('ended');
   });
 });
+
+describe('voiceReducer basic transitions', () => {
+  it('starts idle with an empty transcript', () => {
+    expect(initialVoiceState.status).toBe('idle');
+    expect(initialVoiceState.turns).toEqual([]);
+  });
+
+  it('goes live on ready', () => {
+    const s = voiceReducer(initialVoiceState, { kind: 'server', msg: { type: 'ready' } });
+    expect(s.status).toBe('live');
+  });
+
+  it('records an error code, and reaches ended on a server ended status', () => {
+    const errored = voiceReducer(initialVoiceState, { kind: 'server', msg: { type: 'error', code: 'mic-denied', message: 'x' } });
+    expect(errored.error).toBe('mic-denied');
+    const ended = voiceReducer(initialVoiceState, { kind: 'server', msg: { type: 'status', state: 'ended' } });
+    expect(ended.status).toBe('ended');
+  });
+});
