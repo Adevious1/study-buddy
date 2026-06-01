@@ -7,7 +7,7 @@ import {
 } from './recapContent';
 
 /** Non-streaming text model for the post-session recap summary. */
-const RECAP_MODEL = 'gemini-3-flash-preview';
+const RECAP_MODEL = 'gemini-3.5-flash';
 
 /** Generation is bounded so a slow/hung call can never block the session-end path. */
 const RECAP_TIMEOUT_MS = 15_000;

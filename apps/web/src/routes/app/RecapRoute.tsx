@@ -77,7 +77,7 @@ export function RecapRoute() {
 
       {/* Celebration header */}
       <div
-        className="relative overflow-hidden px-5 pb-7 pt-5 text-center"
+        className="relative shrink-0 overflow-hidden px-5 pb-7 pt-5 text-center"
         style={{ background: 'linear-gradient(180deg, var(--color-sun-l) 0%, var(--color-bg) 100%)' }}
       >
         {/* Confetti dots */}

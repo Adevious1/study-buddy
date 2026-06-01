@@ -21,7 +21,16 @@ export const auth = betterAuth({
   // an empty string when unset — `??` would keep '' and break OAuth redirects.
   baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:5173',
   secret,
-  trustedOrigins: ['http://localhost:5173', 'http://localhost:3001'],
+  trustedOrigins: [
+    'http://localhost:5173',
+    'http://localhost:3001',
+    // Allow the public app URL (e.g. an https tunnel) when set to something other
+    // than the localhost default, so a guardian can sign in off-localhost during
+    // family testing.
+    ...(process.env.PUBLIC_APP_URL && process.env.PUBLIC_APP_URL !== 'http://localhost:5173'
+      ? [process.env.PUBLIC_APP_URL]
+      : []),
+  ],
   database: drizzleAdapter(db, {
     provider: 'pg',
     schema: { ...schema },
