@@ -9,8 +9,13 @@ import {
 /** Non-streaming text model for the post-session recap summary. */
 const RECAP_MODEL = 'gemini-3.5-flash';
 
-/** Generation is bounded so a slow/hung call can never block the session-end path. */
-const RECAP_TIMEOUT_MS = 15_000;
+/**
+ * Generation is bounded so a slow/hung call can never block the session-end path.
+ * 30s gives headroom for a cold call + structured-output latency; the warm call is
+ * ~7s, but the first call after a live session (fresh connection, possible network
+ * contention) can spike, and a too-tight bound silently degrades to the fallback.
+ */
+const RECAP_TIMEOUT_MS = 30_000;
 
 export interface RecapGenInput {
   turns: TranscriptTurn[];
@@ -46,12 +51,20 @@ export async function generateRecap(
   timeoutMs: number = RECAP_TIMEOUT_MS,
 ): Promise<RecapContent> {
   if (!generator) return fallbackRecap();
+  const startedAt = Date.now();
   try {
     const instruction = await buildRecapInstruction(input);
     const script = transcriptToScript(input.turns, input.childName);
     const raw = await withTimeout(generator(instruction, script), timeoutMs);
-    return parseRecapContent(raw) ?? fallbackRecap();
-  } catch {
+    const parsed = parseRecapContent(raw);
+    if (!parsed) {
+      console.warn(`[recap] model output failed validation after ${Date.now() - startedAt}ms; using fallback`);
+      return fallbackRecap();
+    }
+    console.info(`[recap] generated in ${Date.now() - startedAt}ms`);
+    return parsed;
+  } catch (err) {
+    console.warn(`[recap] generation failed after ${Date.now() - startedAt}ms (${(err as Error)?.message ?? String(err)}); using fallback`);
     return fallbackRecap();
   }
 }
