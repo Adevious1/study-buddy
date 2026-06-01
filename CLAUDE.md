@@ -100,7 +100,11 @@ subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-05
 - `SP5-manual-smoke.md` (billing) — 🟡 **partial**: trial/banner/gates (402 + client
   `/app`→`/subscribe`) verified; the live Stripe Checkout/Portal payment flow is
   tabled (needs Stripe test creds + the Stripe CLI — see [[sp5-stripe-live-smoke-pending]]).
-- `SP6-manual-smoke.md` (live recap loop) — 🟡 **pending** a human mic run.
+- `SP6-manual-smoke.md` (live recap loop) — ✅ **verified** via a human mic run
+  (2026-06-01): full loop end to end (mic → Pip → persisted transcript →
+  `gemini-3.5-flash` summary → populated `/app/recap`), real session-specific
+  recap generated. Required the recap model fix (`gemini-3.5-flash`) and a 30s
+  generation timeout; the graceful fallback path is also confirmed.
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 

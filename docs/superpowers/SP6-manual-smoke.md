@@ -1,5 +1,17 @@
 # SP6 — Session Recap manual smoke
 
+**Status: ✅ verified (2026-06-01)** via a real human mic run. The full loop works
+end to end — mic → Pip → transcript persisted → non-streaming `gemini-3.5-flash`
+summary → populated `/app/recap`. Confirmed live: a 16-turn math session produced
+a genuine recap (⭐⭐⭐, solved 2/2, "You Explain Math Beautifully", session-specific
+"figured out" items), with `[recap] generated in 4364ms` in the server log. Two
+fixes were needed to get here: the recap model is `gemini-3.5-flash` (the earlier
+`gemini-3-flash-preview` failed for our key and silently fell back), and the
+generation timeout is 30s (a too-tight 15s bound let a cold first-call after the
+live socket closed degrade to the fallback). The graceful fallback path itself is
+also confirmed working (a transient failure rendered the encouraging placeholder,
+not a broken screen).
+
 **Prereqs:** full stack up (`docker compose up`), `GEMINI_API_KEY` set, and the
 `transcript` migration applied (the server applies migrations on boot via
 `docker-entrypoint.sh`; if you changed schema since the last boot, run
