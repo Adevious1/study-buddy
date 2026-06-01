@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { SubjectKind } from '@study-buddy/shared';
-import { renderTemplate, loadTemplateFile } from '../lib/promptTemplate';
+import { renderTemplate, loadTemplateFile, SUBJECT_NAME } from '../lib/promptTemplate';
 
 export interface RecapPromptInput {
   childName: string;
@@ -8,11 +8,6 @@ export interface RecapPromptInput {
   subjectKind: SubjectKind;
   topic: string;
 }
-
-const SUBJECT_NAME: Record<SubjectKind, string> = {
-  math: 'Math', reading: 'Reading', science: 'Science',
-  writing: 'Writing', spanish: 'Spanish', social: 'Social Studies',
-};
 
 /**
  * Canonical recap-writer instruction. Both the fallback (when study-buddy-recap.md

@@ -1,4 +1,11 @@
 import { readFile } from 'node:fs/promises';
+import type { SubjectKind } from '@study-buddy/shared';
+
+/** Display label for each subject, used when rendering Gemini instructions. */
+export const SUBJECT_NAME: Record<SubjectKind, string> = {
+  math: 'Math', reading: 'Reading', science: 'Science',
+  writing: 'Writing', spanish: 'Spanish', social: 'Social Studies',
+};
 
 /**
  * Substitute {{tokens}}, strip ATX markdown heading lines, and drop blank lines

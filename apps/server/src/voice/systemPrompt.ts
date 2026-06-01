@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { LearningStyleTrait, SubjectKind } from '@study-buddy/shared';
-import { renderTemplate, loadTemplateFile } from '../lib/promptTemplate';
+import { renderTemplate, loadTemplateFile, SUBJECT_NAME } from '../lib/promptTemplate';
 
 export { renderTemplate }; // re-exported so existing importers/tests are unaffected
 
@@ -13,11 +13,6 @@ export interface SystemPromptInput {
   /** True only on the child's very first session ever; gates Pip's self-intro. */
   firstSession: boolean;
 }
-
-const SUBJECT_NAME: Record<SubjectKind, string> = {
-  math: 'Math', reading: 'Reading', science: 'Science',
-  writing: 'Writing', spanish: 'Spanish', social: 'Social Studies',
-};
 
 /**
  * Canonical Pip behavior. This is both the fallback (when study-buddy.md is
