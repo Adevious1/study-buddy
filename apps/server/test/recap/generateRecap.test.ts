@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'bun:test';
-import { generateRecap, type RecapGenerator } from '../../src/recap/generateRecap';
+import {
+  generateRecap, makeRecapGeneratorFromModelCall,
+  type RecapGenerator, type ModelCall,
+} from '../../src/recap/generateRecap';
 import { fallbackRecap, STARS_MAX } from '../../src/recap/recapContent';
 import type { TranscriptTurn } from '@study-buddy/shared';
 
@@ -56,6 +59,51 @@ describe('generateRecap', () => {
 
   it('falls back when no generator is provided', async () => {
     const r = await generateRecap(input, null);
+    expect(r).toEqual(fallbackRecap());
+  });
+});
+
+describe('makeRecapGeneratorFromModelCall (retry + backup plan)', () => {
+  it('uses only the primary model when the first attempt succeeds', async () => {
+    const seen: string[] = [];
+    const call: ModelCall = async (model) => { seen.push(model); return goodRaw; };
+    const gen = makeRecapGeneratorFromModelCall(call, ['primary', 'primary', 'backup']);
+    const r = await gen('inst', 'script');
+    expect(r).toEqual(goodRaw);
+    expect(seen).toEqual(['primary']);
+  });
+
+  it('retries the primary, then falls over to the backup model', async () => {
+    const seen: string[] = [];
+    const call: ModelCall = async (model) => {
+      seen.push(model);
+      if (model === 'primary') throw new Error('503 high demand');
+      return { from: model };
+    };
+    const gen = makeRecapGeneratorFromModelCall(call, ['primary', 'primary', 'backup']);
+    const r = await gen('inst', 'script');
+    expect(r).toEqual({ from: 'backup' });
+    expect(seen).toEqual(['primary', 'primary', 'backup']);
+  });
+
+  it('forwards the instruction and transcript to each attempt', async () => {
+    const calls: Array<{ model: string; instruction: string; script: string }> = [];
+    const call: ModelCall = async (model, instruction, script) => {
+      calls.push({ model, instruction, script });
+      throw new Error('down');
+    };
+    const gen = makeRecapGeneratorFromModelCall(call, ['a', 'b']);
+    await gen('the-instruction', 'the-script').catch(() => {});
+    expect(calls.map((c) => c.model)).toEqual(['a', 'b']);
+    expect(calls.every((c) => c.instruction === 'the-instruction' && c.script === 'the-script')).toBe(true);
+  });
+
+  it('throws the last error when every attempt fails (generateRecap then falls back)', async () => {
+    const call: ModelCall = async () => { throw new Error('all-models-down'); };
+    const gen = makeRecapGeneratorFromModelCall(call, ['a', 'b']);
+    await expect(gen('inst', 'script')).rejects.toThrow('all-models-down');
+    // composed with generateRecap, a fully-failed plan yields the encouraging fallback
+    const r = await generateRecap(input, gen);
     expect(r).toEqual(fallbackRecap());
   });
 });

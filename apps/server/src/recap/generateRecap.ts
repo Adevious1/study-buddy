@@ -6,16 +6,28 @@ import {
   RECAP_RESPONSE_SCHEMA, type RecapContent,
 } from './recapContent';
 
-/** Non-streaming text model for the post-session recap summary. */
-const RECAP_MODEL = 'gemini-3.5-flash';
-
+// ─── Recap models — update these as Gemini ships newer models ──────────────────
+/** Primary non-streaming model for the post-session recap summary. */
+const RECAP_PRIMARY_MODEL = 'gemini-3.5-flash';
+/** Backup model, tried when the primary is transiently unavailable (e.g. a 503 surge). */
+const RECAP_BACKUP_MODEL = 'gemini-3.1-flash-lite';
 /**
- * Generation is bounded so a slow/hung call can never block the session-end path.
- * 30s gives headroom for a cold call + structured-output latency; the warm call is
- * ~7s, but the first call after a live session (fresh connection, possible network
- * contention) can spike, and a too-tight bound silently degrades to the fallback.
+ * Attempt order for one generation: try the primary, retry the primary once, then
+ * fall over to the backup model. The first success wins; only if all fail do we use
+ * the encouraging placeholder. Keeps a real recap flowing through a transient
+ * primary-model outage.
  */
-const RECAP_TIMEOUT_MS = 30_000;
+const RECAP_MODEL_PLAN: readonly string[] = [
+  RECAP_PRIMARY_MODEL,
+  RECAP_PRIMARY_MODEL,
+  RECAP_BACKUP_MODEL,
+];
+// ───────────────────────────────────────────────────────────────────────────────
+
+/** Per-model-attempt ceiling so one slow/hung call can't stall the whole plan. */
+const PER_ATTEMPT_TIMEOUT_MS = 15_000;
+/** Overall ceiling around a generation (backstop over the full plan). */
+const RECAP_TIMEOUT_MS = 45_000;
 
 export interface RecapGenInput {
   turns: TranscriptTurn[];
@@ -31,6 +43,9 @@ export interface RecapGenInput {
  * pass a fake. May throw — generateRecap catches and falls back.
  */
 export type RecapGenerator = (instruction: string, transcriptScript: string) => Promise<unknown>;
+
+/** A single model call (one model, one attempt). May throw / time out. */
+export type ModelCall = (model: string, instruction: string, transcriptScript: string) => Promise<unknown>;
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -69,19 +84,48 @@ export async function generateRecap(
   }
 }
 
-/** Production generator backed by @google/genai (non-streaming, structured output). */
+/**
+ * Wrap a single-model call into a RecapGenerator that walks RECAP_MODEL_PLAN:
+ * try each model in order, return the first success; if every attempt fails, throw
+ * the last error (generateRecap then uses the encouraging fallback).
+ */
+export function makeRecapGeneratorFromModelCall(
+  call: ModelCall,
+  plan: readonly string[] = RECAP_MODEL_PLAN,
+): RecapGenerator {
+  return async (instruction, transcriptScript) => {
+    let lastErr: unknown = new Error('no recap model attempted');
+    for (let i = 0; i < plan.length; i++) {
+      try {
+        return await call(plan[i], instruction, transcriptScript);
+      } catch (err) {
+        lastErr = err;
+        console.warn(
+          `[recap] model ${plan[i]} (attempt ${i + 1}/${plan.length}) failed: ${(err as Error)?.message ?? String(err)}`,
+        );
+      }
+    }
+    throw lastErr;
+  };
+}
+
+/** Production generator backed by @google/genai (non-streaming, structured output, plan-aware). */
 export function makeGeminiRecapGenerator(apiKey: string): RecapGenerator {
   const ai = new GoogleGenAI({ apiKey });
-  return async (instruction, transcriptScript) => {
-    const res = await ai.models.generateContent({
-      model: RECAP_MODEL,
-      contents: transcriptScript,
-      config: {
-        systemInstruction: instruction,
-        responseMimeType: 'application/json',
-        responseSchema: RECAP_RESPONSE_SCHEMA,
-      },
-    });
+  const call: ModelCall = async (model, instruction, transcriptScript) => {
+    const res = await withTimeout(
+      ai.models.generateContent({
+        model,
+        contents: transcriptScript,
+        config: {
+          systemInstruction: instruction,
+          responseMimeType: 'application/json',
+          responseSchema: RECAP_RESPONSE_SCHEMA,
+        },
+      }),
+      PER_ATTEMPT_TIMEOUT_MS,
+    );
     return JSON.parse(res.text ?? '{}');
   };
+  return makeRecapGeneratorFromModelCall(call);
 }

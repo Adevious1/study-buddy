@@ -10,8 +10,11 @@ export interface StartArgs { subjectKind: SubjectKind; topic: string; title: str
 const WS_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
 
 // Safety net: if the relay never confirms the session ended (crash/network),
-// stop waiting after this long so the child is never stuck "wrapping up".
-const RECAP_REVEAL_TIMEOUT_MS = 20_000;
+// stop waiting after this long so the child is never stuck "wrapping up". Sized
+// above the server's worst-case recap budget (retry the primary model + fall over
+// to the backup) so a transient model outage still reveals a real recap rather
+// than the client bailing early to a placeholder.
+const RECAP_REVEAL_TIMEOUT_MS = 40_000;
 
 function wsUrl(childId: string): string {
   const httpBase = WS_BASE.startsWith('http')
