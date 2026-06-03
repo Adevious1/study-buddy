@@ -8,6 +8,7 @@ import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Flame, Sparkle, SubjectIcon } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
 import { repository } from '../../data';
+import { snapshotImageUrl } from '../../data/apiRepository';
 import { formatDuration, formatDelta, formatProgressLabel } from '../../format';
 import { subjectLabel, subjectTheme } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
@@ -38,6 +39,10 @@ export function DashboardRoute() {
   const assignmentsQ = useQuery({
     queryKey: ['child', childId, 'assignments'],
     queryFn: () => repository.getTodayAssignments(),
+  });
+  const snapshotsQ = useQuery({
+    queryKey: ['child', childId, 'snapshots'],
+    queryFn: () => repository.getRecentSnapshots(),
   });
   const meQ = useQuery({ queryKey: ['me'], queryFn: repositoryMe });
   const ent = meQ.data?.entitlement;
@@ -439,6 +444,34 @@ export function DashboardRoute() {
             );
           })}
         </div>
+        )}
+
+        {/* What the child showed Pip */}
+        {snapshotsQ.data && snapshotsQ.data.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <SectionTitle>What {student.name} showed Pip</SectionTitle>
+            <div
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginTop: 12 }}
+            >
+              {snapshotsQ.data.map((s) => (
+                <a
+                  key={s.id}
+                  href={snapshotImageUrl(s.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-[14px] overflow-hidden border-[1.5px] border-line"
+                  title={`${subjectLabel(s.subjectKind)} · ${new Date(s.createdAt).toLocaleDateString()}`}
+                >
+                  <img
+                    src={snapshotImageUrl(s.id)}
+                    alt={`${subjectLabel(s.subjectKind)} snapshot`}
+                    loading="lazy"
+                    style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Open app link — bottom of main */}
