@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  pgTable, uuid, text, integer, date, timestamp, jsonb, check, uniqueIndex, index, boolean,
+  pgTable, uuid, text, integer, date, timestamp, jsonb, check, uniqueIndex, index, boolean, customType,
 } from 'drizzle-orm/pg-core';
 import type { PipColor } from '@study-buddy/shared';
 
@@ -8,6 +8,11 @@ const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 };
+
+/** Postgres bytea ↔ Node Buffer. node-postgres returns bytea columns as Buffer. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() { return 'bytea'; },
+});
 
 // --- better-auth-owned tables (user / session / account / verification) ---
 // Shape is dictated by better-auth's Drizzle adapter; do not hand-edit columns.
@@ -191,5 +196,23 @@ export const learningProfileTraits = pgTable(
     ),
     scoreRangeCheck: check('lpt_score_range_check', sql`${t.score} BETWEEN 0 AND 100`),
     profileTraitUnique: uniqueIndex('lpt_profile_trait_unique').on(t.profileId, t.traitId),
+  }),
+);
+
+// Camera snapshots a child showed Pip during a live session (SP7). bytea keeps
+// the image inside the DB/authz model; child_id is denormalized for ownership
+// checks without a join.
+export const sessionSnapshots = pgTable(
+  'session_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sessionId: uuid('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+    childId: uuid('child_id').notNull().references(() => children.id, { onDelete: 'cascade' }),
+    image: bytea('image').notNull(),
+    mime: text('mime').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    childCreatedIdx: index('session_snapshots_child_created_idx').on(t.childId, t.createdAt.desc()),
   }),
 );
