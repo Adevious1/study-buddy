@@ -7,6 +7,7 @@ import { Bubble } from '../../components/ui/Bubble';
 import { ErrorState } from '../../components/atoms/ErrorState';
 import { usePipColor } from '../../state/PipColorContext';
 import { useVoiceSession } from '../../voice/useVoiceSession';
+import { SnapshotCapture } from '../../voice/SnapshotCapture';
 import { subjectLabel } from '../../theme/subjectTheme';
 
 // ─── Local atoms ───────────────────────────────────────────────
@@ -118,8 +119,9 @@ export function VoiceRoute() {
   const { pipColorValue } = usePipColor();
   const nav = (location.state ?? {}) as VoiceNavState;
 
-  const { state, start, end, mute, unmute } = useVoiceSession();
+  const { state, start, end, mute, unmute, sendSnapshot, consumeCameraOffer } = useVoiceSession();
   const [muted, setMuted] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const [picked, setPicked] = useState<{ subjectKind: SubjectKind; topic: string; title: string } | null>(
     nav.subjectKind
       ? { subjectKind: nav.subjectKind, topic: nav.topic ?? '', title: nav.title ?? subjectLabel(nav.subjectKind) }
@@ -208,7 +210,7 @@ export function VoiceRoute() {
 
   return (
     <div
-      className="flex-1 flex flex-col min-h-0 overflow-hidden"
+      className="relative flex-1 flex flex-col min-h-0 overflow-hidden"
       style={{ background: `radial-gradient(80% 60% at 50% 0%, var(--color-coral-l) 0%, var(--color-bg) 65%)` }}
     >
       <div className="flex items-center gap-3 px-[18px] py-3">
@@ -235,6 +237,14 @@ export function VoiceRoute() {
           {state.status === 'resuming' ? 'one sec…' : state.status === 'connecting' ? 'connecting…' : 'live'}
         </div>
       </div>
+
+      {state.cameraOffered && !showCamera && (
+        <div className="px-[18px] -mt-1 mb-1 text-center">
+          <span className="inline-block px-3 py-[5px] rounded-full bg-coral-l text-coral-d font-body font-bold text-[12px]">
+            Tap "Show Pip" to share a picture!
+          </span>
+        </div>
+      )}
 
       {/* Pip + status. Once the conversation has turns, Pip shrinks and moves up
           so the transcript below can take the freed vertical space. */}
@@ -263,6 +273,19 @@ export function VoiceRoute() {
 
       <div className="flex shrink-0 items-center justify-between px-6 pt-[14px] pb-[18px]">
         <ControlBtn
+          label="Show Pip"
+          onClick={() => { setShowCamera(true); consumeCameraOffer(); }}
+          icon={
+            <div className={state.cameraOffered ? 'animate-ring-pulse rounded-full' : ''}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="7" width="18" height="13" rx="3" stroke="var(--color-ink-2)" strokeWidth="2" />
+                <circle cx="12" cy="13.5" r="3.5" stroke="var(--color-ink-2)" strokeWidth="2" />
+                <path d="M8 7 L9.5 4.5 H14.5 L16 7" stroke="var(--color-ink-2)" strokeWidth="2" strokeLinejoin="round" />
+              </svg>
+            </div>
+          }
+        />
+        <ControlBtn
           label={muted ? 'Unmute' : 'Mute'}
           onClick={() => { muted ? unmute() : mute(); setMuted((m) => !m); }}
           icon={
@@ -284,6 +307,13 @@ export function VoiceRoute() {
           }
         />
       </div>
+
+      {showCamera && (
+        <SnapshotCapture
+          onCapture={(b64) => { sendSnapshot(b64); setShowCamera(false); }}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
     </div>
   );
 }
