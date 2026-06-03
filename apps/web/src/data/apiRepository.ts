@@ -1,6 +1,6 @@
 import type {
   Student, Assignment, ContinueSession, Subject,
-  LearningProfile, WeekActivity, RecapResult,
+  LearningProfile, WeekActivity, RecapResult, SnapshotMeta,
 } from '@study-buddy/shared';
 import type { Repository } from './repository';
 
@@ -57,4 +57,10 @@ export const apiRepository: Repository = {
   getLearningProfile:  (): Promise<LearningProfile | null> => getOrNull(`/children/${getActiveChildId()}/learning-profile`),
   getWeekActivity:     (): Promise<WeekActivity>           => get(`/children/${getActiveChildId()}/activity?range=week`),
   getRecap:            (): Promise<RecapResult | null>     => getOrNull(`/children/${getActiveChildId()}/sessions/latest/recap`),
+  getRecentSnapshots:  (): Promise<SnapshotMeta[]>        => get(`/children/${getActiveChildId()}/snapshots`),
 };
+
+/** Same-origin URL for a stored snapshot image; cookies are sent automatically by <img>. */
+export function snapshotImageUrl(id: string): string {
+  return `${base}/children/${getActiveChildId()}/snapshots/${id}`;
+}

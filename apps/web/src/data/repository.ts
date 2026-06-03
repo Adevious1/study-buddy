@@ -1,6 +1,6 @@
 import type {
   Student, Assignment, ContinueSession, Subject,
-  LearningProfile, WeekActivity, RecapResult,
+  LearningProfile, WeekActivity, RecapResult, SnapshotMeta,
 } from '@study-buddy/shared';
 
 export interface Repository {
@@ -14,4 +14,6 @@ export interface Repository {
   getWeekActivity(): Promise<WeekActivity>;
   /** null when the child has no completed session to recap yet. */
   getRecap(): Promise<RecapResult | null>;
+  /** Recent snapshots the child showed Pip; [] when none. */
+  getRecentSnapshots(): Promise<SnapshotMeta[]>;
 }
