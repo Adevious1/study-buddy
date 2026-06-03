@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { computeTargetSize } from './imageEncode';
+import { computeTargetSize, captureJpegFromVideo } from './imageEncode';
 
 describe('computeTargetSize', () => {
   it('scales the longest edge down to maxEdge, preserving aspect ratio', () => {
@@ -8,5 +8,12 @@ describe('computeTargetSize', () => {
   });
   it('leaves images already within maxEdge unchanged', () => {
     expect(computeTargetSize(800, 600, 1024)).toEqual({ w: 800, h: 600 });
+  });
+});
+
+describe('captureJpegFromVideo', () => {
+  it('throws on a not-ready (0x0) video instead of producing a blank image', () => {
+    const fakeVideo = { videoWidth: 0, videoHeight: 0 } as unknown as HTMLVideoElement;
+    expect(() => captureJpegFromVideo(fakeVideo)).toThrow();
   });
 });

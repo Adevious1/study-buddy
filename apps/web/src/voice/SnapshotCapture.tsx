@@ -45,7 +45,11 @@ export function SnapshotCapture({ onCapture, onClose }: Props) {
 
   function takePhoto() {
     if (!videoRef.current) return;
-    setFrozen(captureJpegFromVideo(videoRef.current));
+    try {
+      setFrozen(captureJpegFromVideo(videoRef.current));
+    } catch {
+      // camera not ready yet — ignore the tap, keep showing live preview
+    }
   }
 
   return (

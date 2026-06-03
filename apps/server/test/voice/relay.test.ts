@@ -5,6 +5,7 @@ import { makeFakeGemini } from '../../src/voice/fakeGeminiSession';
 import { makeFakeRecapGenerator } from '../../src/recap/fakeRecapGenerator';
 import type { ServerControl } from '@study-buddy/shared';
 import { listRecentSnapshotsForChild } from '../../src/voice/snapshots';
+import type { GeminiConnector } from '../../src/voice/geminiSession';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let createRelay: any;
@@ -205,5 +206,19 @@ describe('voice relay', () => {
 
     expect(out.control).toContainEqual({ type: 'camera-offered' });
     expect(fake.sent.acks).toContain('offer_camera');
+  });
+
+  it('acks ok:false (and does not crash) when sendImage throws', async () => {
+    const out = sink();
+    const throwingConnector: GeminiConnector = async () => ({
+      sendAudio() {}, sendImage() { throw new Error('ws closed'); }, sendText() {},
+      ackTool() {}, audioStreamEnd() {}, close: async () => {},
+    });
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: throwingConnector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Shapes', title: 'Shapes' });
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0x10]).toString('base64');
+    await relay.handleControl({ type: 'snapshot', mime: 'image/jpeg', data: jpeg });
+    expect(out.control).toContainEqual({ type: 'snapshot-ack', ok: false });
+    expect(out.control.find((m) => m.type === 'snapshot-ack' && m.ok === true)).toBeFalsy();
   });
 });

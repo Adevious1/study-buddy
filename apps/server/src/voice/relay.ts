@@ -178,7 +178,12 @@ export function createRelay(opts: RelayOptions) {
       return;
     }
     // Forward to Pip first (the conversational value); persistence is best-effort.
-    session.sendImage(data);
+    try {
+      session.sendImage(data);
+    } catch {
+      sink.sendControl({ type: 'snapshot-ack', ok: false });
+      return;
+    }
     try {
       await saveSnapshot(sessionRowId, childId, bytes, mime);
     } catch (e) {

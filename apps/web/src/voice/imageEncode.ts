@@ -16,6 +16,9 @@ export function captureJpegFromVideo(
   maxEdge = 1024,
   quality = 0.85,
 ): string {
+  if (video.videoWidth === 0 || video.videoHeight === 0) {
+    throw new Error('camera not ready');
+  }
   const { w, h } = computeTargetSize(video.videoWidth, video.videoHeight, maxEdge);
   const canvas = document.createElement('canvas');
   canvas.width = w;
