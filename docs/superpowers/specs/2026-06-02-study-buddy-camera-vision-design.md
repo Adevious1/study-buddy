@@ -176,13 +176,19 @@ one-shot, not streamed.)
   `listSnapshotsForSession(sessionId)`.
 
 ### Routes — `apps/server/src/routes/`
-Two endpoints, both behind the **existing `childContext` guardian-ownership authz**
-(unowned child → 404, no session → 401 — no new auth logic, reuse SP4):
-- `GET /api/children/:childId/sessions/:sessionId/snapshots` → JSON list of
-  `{ id, createdAt }` (metadata only, ordered by `created_at`).
-- `GET /api/children/:childId/sessions/:sessionId/snapshots/:snapshotId` → the
-  image bytes with `Content-Type: image/jpeg`, so the dashboard can use a plain
-  `<img src>`.
+Two **child-scoped** endpoints, both behind the existing `childContext`
+guardian-ownership authz (unowned child → 404, no session → 401 — no new auth
+logic, reuse SP4):
+- `GET /api/children/:childId/snapshots` → JSON `SnapshotMeta[]`
+  (`{ id, sessionId, subjectKind, createdAt }`, newest first, limit 24).
+- `GET /api/children/:childId/snapshots/:snapshotId` → image bytes with a pinned
+  `Content-Type: image/jpeg` (allowlisted, never the raw stored mime),
+  `X-Content-Type-Options: nosniff`, a CSP sandbox, and `Content-Disposition:
+  inline` — safe for a plain `<img src>` and direct navigation.
+
+> The dashboard has no session-detail/history surface yet (SP6 deferred it), so
+> v1 ships a flat "What {child} showed Pip" panel fed by the list endpoint rather
+> than a per-session strip. Per-session grouping is a later add.
 
 ### Database — Drizzle migration
 New table `session_snapshots`:
