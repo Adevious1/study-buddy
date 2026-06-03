@@ -32,6 +32,17 @@ before merge. pnpm monorepo; everything runs in Docker. HEAD: `4a7e24b`.
   bounded generation with graceful fallback; abandoned sessions persist transcript
   but get no recap. Code on `sp6-session-recap`. 🟡 pending human mic smoke
   (`SP6-manual-smoke.md`).
+- **SP7 camera vision ("Show Pip")** — snapshot-on-demand over the SP3 voice WS →
+  `sendRealtimeInput({ video })` into the same Gemini Live session; `session_snapshots`
+  bytea storage; `offer_camera` invite tool (→ `camera-offered` button pulse);
+  preview+confirm `SnapshotCapture` overlay; single JPEG (≤1024px/q0.85) for both Pip
+  and storage; Socratic-on-vision prompt rule; child-scoped read endpoints behind
+  `childContext` authz with a hardened image-serve (pinned mime + nosniff + CSP); a
+  guardian `/dashboard` "What {child} showed Pip" panel. Server 122 tests pass; web
+  typecheck/build/units pass. Code on `worktree-sp7-camera-vision`. 🟡 pending human
+  mic smoke (`SP7-manual-smoke.md`). Spec + plan under
+  `docs/superpowers/specs/2026-06-02-study-buddy-camera-vision-design.md` and
+  `docs/superpowers/plans/2026-06-02-camera-vision.md`.
 
 ## Pip's voice behavior is now tunable (SP3)
 

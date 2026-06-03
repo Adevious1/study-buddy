@@ -15,6 +15,28 @@ SP5 (billing), and SP6 (session recap) are all done. SP1–SP4 are merged to
 `main`; SP5 is on the `sp5-billing` branch; SP6 is on the `sp6-session-recap`
 branch.**
 
+**SP7 (camera vision / "Show Pip") is implemented on the
+`worktree-sp7-camera-vision` branch, pending its human mic smoke
+(`SP7-manual-smoke.md`).** During a live voice session a child taps a camera
+button to show Pip a photo of their work (drawing, worksheet/textbook, or
+anything they name). The JPEG (downscaled to ≤1024px / q0.85) rides the existing
+SP3 voice WebSocket as a `snapshot` control message; the relay forwards it into
+the same Gemini Live session via `sendRealtimeInput({ video })` so Pip sees and
+reacts in conversation, and persists it to a new `session_snapshots` (Postgres
+`bytea`) table. Capture is preview-and-confirm; Pip can *invite* the camera via a
+new `offer_camera` function-calling tool (relay → `camera-offered` → the
+always-visible camera button pulses), but only the child taps the shutter. The
+**Socratic rule extends to vision**: even when a photo shows the answer, Pip
+guides rather than reads it out (enforced in the tunable `study-buddy.md`
+prompt). Snapshots are viewable by the guardian on `/dashboard` via child-scoped
+read endpoints behind the SP4 `childContext` ownership authz; the image-serve
+endpoint pins `Content-Type` + `nosniff` + CSP-sandbox against stored-mime XSS.
+Key files: `apps/server/src/voice/snapshots.ts`, `routes/snapshots.ts`, the
+`session_snapshots` schema/migration, relay `handleSnapshot` + `offer_camera`,
+and client `SnapshotCapture.tsx` / `imageEncode.ts` / `useVoiceSession` /
+`VoiceRoute` / the dashboard panel. **Single JPEG for both Pip and storage**
+(webp storage and child-recap thumbnails are deferred).
+
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
 live transcript, and learning-style detection via function calling committing
@@ -158,6 +180,13 @@ implementation cycle. **Do not collapse these into one effort.**
    into the existing recap UI; transcript persistence (new `sessions.transcript`
    jsonb); tunable recap prompt (`study-buddy-recap.md`); generate-then-reveal UX
    (wrapping-up screen → `/app/recap`). (On `sp6-session-recap`.)
+7. **Camera vision ("Show Pip")** ✓ _implemented_ — snapshot-on-demand: a child
+   shows Pip a photo during a live session; the JPEG rides the SP3 voice WS and is
+   forwarded into the same Gemini Live session (`sendRealtimeInput({ video })`),
+   persisted as `session_snapshots` (Postgres `bytea`); preview+confirm capture;
+   `offer_camera` tool lets Pip invite the camera; Socratic-on-vision prompt rule;
+   guardian dashboard viewer behind `childContext` authz. Pending human mic smoke
+   (`SP7-manual-smoke.md`). (On `worktree-sp7-camera-vision`.)
 
 ## Planned layout (pnpm monorepo)
 
