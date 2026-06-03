@@ -11,6 +11,7 @@ export type ClientControl =
   | { type: 'start'; subjectKind: SubjectKind; topic: string; title: string }
   | { type: 'mute' }
   | { type: 'unmute' }
+  | { type: 'snapshot'; mime: 'image/jpeg'; data: string /* base64, no data-URL prefix */ }
   | { type: 'end' };
 
 /** Relay → browser control messages. Audio is sent separately as binary frames. */
@@ -19,6 +20,8 @@ export type ServerControl =
   | { type: 'transcript'; role: 'pip' | 'child'; text: string; final: boolean }
   | { type: 'interrupted' }
   | { type: 'status'; state: VoiceStatus }
+  | { type: 'snapshot-ack'; ok: boolean }
+  | { type: 'camera-offered' }
   | { type: 'error'; code: VoiceErrorCode; message: string };
 
 /** Learning-style signal Pip emits via function calling. */
@@ -32,4 +35,12 @@ export interface LearningSignal {
 export interface TranscriptTurn {
   role: 'pip' | 'child';
   text: string;
+}
+
+/** Metadata for one stored snapshot, listed on the guardian dashboard. */
+export interface SnapshotMeta {
+  id: string;
+  sessionId: string;
+  subjectKind: SubjectKind;
+  createdAt: string; // ISO timestamp
 }
