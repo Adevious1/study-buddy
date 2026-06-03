@@ -119,7 +119,15 @@ export function useVoiceSession() {
   const mute = useCallback(() => { mutedRef.current = true; send({ type: 'mute' }); }, []);
   const unmute = useCallback(() => { mutedRef.current = false; send({ type: 'unmute' }); }, []);
 
+  const sendSnapshot = useCallback((base64: string) => {
+    send({ type: 'snapshot', mime: 'image/jpeg', data: base64 });
+  }, []);
+
+  const consumeCameraOffer = useCallback(() => {
+    dispatch({ kind: 'camera-consumed' });
+  }, []);
+
   useEffect(() => teardown, [teardown]);
 
-  return { state, start, end, mute, unmute };
+  return { state, start, end, mute, unmute, sendSnapshot, consumeCameraOffer };
 }
