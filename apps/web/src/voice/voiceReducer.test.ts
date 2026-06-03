@@ -83,3 +83,16 @@ describe('voiceReducer basic transitions', () => {
     expect(ended.status).toBe('ended');
   });
 });
+
+describe('camera offer', () => {
+  it('sets cameraOffered on camera-offered and clears it on camera-consumed', () => {
+    let s = voiceReducer(initialVoiceState, { kind: 'server', msg: { type: 'camera-offered' } });
+    expect(s.cameraOffered).toBe(true);
+    s = voiceReducer(s, { kind: 'camera-consumed' });
+    expect(s.cameraOffered).toBe(false);
+  });
+  it('ignores snapshot-ack without throwing', () => {
+    const s = voiceReducer(initialVoiceState, { kind: 'server', msg: { type: 'snapshot-ack', ok: true } });
+    expect(s).toEqual(initialVoiceState);
+  });
+});
