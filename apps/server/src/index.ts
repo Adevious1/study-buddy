@@ -9,6 +9,7 @@ import { learningProfileRoute } from './routes/learningProfile';
 import { activityRoute } from './routes/activity';
 import { childContext, type ChildVariables } from './lib/childContext';
 import { voiceRoute, voiceWebsocket } from './voice/voiceRoute';
+import { snapshotsRoute } from './routes/snapshots';
 import { auth } from './lib/auth';
 import { meRoute } from './routes/me';
 import { billingRoute } from './routes/billing';
@@ -33,6 +34,7 @@ api.route('/children', subjectsRoute);
 api.route('/children', learningProfileRoute);
 api.route('/children', activityRoute);
 api.route('/children', voiceRoute);
+api.route('/children', snapshotsRoute);
 
 app.route('/api', api);
 

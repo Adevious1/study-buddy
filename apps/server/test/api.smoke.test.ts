@@ -191,3 +191,30 @@ describe('GET /api/children/:childId/activity?range=week', () => {
     expect(body).not.toHaveProperty('deltaLabel');
   });
 });
+
+describe('GET /api/children/:childId/snapshots', () => {
+  it('lists snapshots for the owning guardian (empty array is valid)', async () => {
+    const res = await app.fetch(
+      new Request(`http://test/api/children/${MAYA_ID}/snapshots`, { headers: { Cookie: cookie } }),
+    );
+    expect(res.status).toBe(200);
+    expect(Array.isArray(await res.json())).toBe(true);
+  });
+
+  it('404s an unknown snapshot id', async () => {
+    const res = await app.fetch(
+      new Request(
+        `http://test/api/children/${MAYA_ID}/snapshots/00000000-0000-0000-0000-0000000000ff`,
+        { headers: { Cookie: cookie } },
+      ),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('401s the list without a session cookie', async () => {
+    const res = await app.fetch(
+      new Request(`http://test/api/children/${MAYA_ID}/snapshots`),
+    );
+    expect(res.status).toBe(401);
+  });
+});
