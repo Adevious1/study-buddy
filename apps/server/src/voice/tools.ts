@@ -26,6 +26,25 @@ export const noteLearningSignalDeclaration: FunctionDeclaration = {
   },
 };
 
+export const offerCameraDeclaration: FunctionDeclaration = {
+  name: 'offer_camera',
+  description:
+    'Invite the child to show you a picture of their work (a drawing, worksheet, ' +
+    'book page, or real objects) when seeing it would help. This only highlights ' +
+    'the camera button for the child — they still tap to take the picture. ' +
+    'Keep talking naturally; do not mention the tool.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      reason: {
+        type: Type.STRING,
+        description: 'Optional short note on why a picture would help.',
+      },
+    },
+    required: [],
+  },
+};
+
 const TRAITS: readonly string[] = ['visual', 'narrative', 'kinesthetic', 'auditory'];
 const STRENGTHS: readonly string[] = ['weak', 'strong'];
 
