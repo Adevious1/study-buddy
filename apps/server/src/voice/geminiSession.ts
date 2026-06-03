@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality } from '@google/genai';
-import { noteLearningSignalDeclaration } from './tools';
+import { noteLearningSignalDeclaration, offerCameraDeclaration } from './tools';
 
 /** Events the relay reacts to. */
 export interface GeminiEvents {
@@ -16,6 +16,7 @@ export interface GeminiEvents {
 /** What the relay can do to a live session. */
 export interface GeminiLiveSession {
   sendAudio(pcm16k: Uint8Array): void;
+  sendImage(jpegBase64: string): void;
   sendText(text: string): void;
   ackTool(id: string, name: string): void;
   audioStreamEnd(): void;
@@ -56,7 +57,7 @@ export function makeGeminiConnector(apiKey: string): GeminiConnector {
         systemInstruction: { parts: [{ text: opts.systemInstruction }] },
         inputAudioTranscription: {},
         outputAudioTranscription: {},
-        tools: [{ functionDeclarations: [noteLearningSignalDeclaration] }],
+        tools: [{ functionDeclarations: [noteLearningSignalDeclaration, offerCameraDeclaration] }],
         sessionResumption: opts.resumptionHandle
           ? { handle: opts.resumptionHandle }
           : {},
@@ -94,6 +95,8 @@ export function makeGeminiConnector(apiKey: string): GeminiConnector {
     return {
       sendAudio: (pcm) =>
         session.sendRealtimeInput({ audio: { data: toBase64(pcm), mimeType: 'audio/pcm;rate=16000' } }),
+      sendImage: (b64) =>
+        session.sendRealtimeInput({ video: { data: b64, mimeType: 'image/jpeg' } }),
       sendText: (text) => session.sendRealtimeInput({ text }),
       ackTool: (id, name) =>
         session.sendToolResponse({ functionResponses: [{ id, name, response: { ok: true } }] }),
