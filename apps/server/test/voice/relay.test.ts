@@ -4,6 +4,7 @@ import { ensureVoiceTestChild, VOICE_TEST_CHILD_ID } from './fixtures';
 import { makeFakeGemini } from '../../src/voice/fakeGeminiSession';
 import { makeFakeRecapGenerator } from '../../src/recap/fakeRecapGenerator';
 import type { ServerControl } from '@study-buddy/shared';
+import { listRecentSnapshotsForChild } from '../../src/voice/snapshots';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let createRelay: any;
@@ -161,5 +162,48 @@ describe('voice relay', () => {
       { role: 'pip', text: 'If 12 apples are shared?' },
       { role: 'child', text: 'six each' },
     ]);
+  });
+
+  it('forwards a snapshot to the live session and persists it', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Shapes', title: 'Shapes' });
+
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0x10, 0x20]).toString('base64');
+    await relay.handleControl({ type: 'snapshot', mime: 'image/jpeg', data: jpeg });
+
+    expect(fake.sent.images).toHaveLength(1);
+    expect(fake.sent.images[0]).toBe(jpeg);
+    expect(out.control).toContainEqual({ type: 'snapshot-ack', ok: true });
+
+    const list = await listRecentSnapshotsForChild(VOICE_TEST_CHILD_ID, 24);
+    expect(list.length).toBeGreaterThan(0);
+  });
+
+  it('rejects a non-jpeg snapshot without forwarding it', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Shapes', title: 'Shapes' });
+
+    // relay is typed `any` so no TS error; this exercises runtime validation of mime
+    await relay.handleControl({ type: 'snapshot', mime: 'image/png', data: 'AAAA' });
+
+    expect(fake.sent.images).toHaveLength(0);
+    expect(out.control).toContainEqual({ type: 'snapshot-ack', ok: false });
+  });
+
+  it('emits camera-offered and acks the tool when Pip calls offer_camera', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Shapes', title: 'Shapes' });
+    const ev = await fake.events();
+
+    ev.onToolCall('call-1', 'offer_camera', {});
+
+    expect(out.control).toContainEqual({ type: 'camera-offered' });
+    expect(fake.sent.acks).toContain('offer_camera');
   });
 });

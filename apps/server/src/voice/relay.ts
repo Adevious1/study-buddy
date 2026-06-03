@@ -9,6 +9,7 @@ import { commitLearningProfile } from './profileCommit';
 import { TranscriptAccumulator, stripTextArtifact } from './transcript';
 import { generateRecap, type RecapGenerator } from '../recap/generateRecap';
 import type { GeminiConnector, GeminiLiveSession, GeminiEvents } from './geminiSession';
+import { saveSnapshot } from './snapshots';
 
 export interface RelaySink {
   sendControl: (m: ServerControl) => void;
@@ -26,6 +27,7 @@ export interface RelayOptions {
 type State = 'idle' | 'connecting' | 'live' | 'resuming' | 'ended';
 
 const SOFT_CAP_MS = 10 * 60 * 1000;
+const MAX_SNAPSHOT_BYTES = 2_000_000; // ~2MB decoded; a 1024px q0.85 JPEG is far smaller
 
 export function createRelay(opts: RelayOptions) {
   const { childId, connector, sink } = opts;
@@ -93,6 +95,7 @@ export function createRelay(opts: RelayOptions) {
       },
       onToolCall: (id, name, args) => {
         if (name === 'note_learning_signal') signals.addRaw(args);
+        if (name === 'offer_camera') sink.sendControl({ type: 'camera-offered' });
         session?.ackTool(id, name);
       },
       onResumptionHandle: (handle) => { resumptionHandle = handle; },
@@ -166,12 +169,31 @@ export function createRelay(opts: RelayOptions) {
     }
   }
 
+  async function handleSnapshot(mime: string, data: string) {
+    if (state !== 'live' || !session || !sessionRowId) return;
+    if (mime !== 'image/jpeg') { sink.sendControl({ type: 'snapshot-ack', ok: false }); return; }
+    const bytes = Buffer.from(data, 'base64');
+    if (bytes.length === 0 || bytes.length > MAX_SNAPSHOT_BYTES) {
+      sink.sendControl({ type: 'snapshot-ack', ok: false });
+      return;
+    }
+    // Forward to Pip first (the conversational value); persistence is best-effort.
+    session.sendImage(data);
+    try {
+      await saveSnapshot(sessionRowId, childId, bytes, mime);
+    } catch (e) {
+      console.error('[snapshot] save failed', e);
+    }
+    sink.sendControl({ type: 'snapshot-ack', ok: true });
+  }
+
   return {
     async handleControl(msg: ClientControl) {
       switch (msg.type) {
         case 'start': await start(msg.subjectKind, msg.topic, msg.title); break;
         case 'mute': session?.audioStreamEnd(); break;
         case 'unmute': break;
+        case 'snapshot': await handleSnapshot(msg.mime, msg.data); break;
         case 'end': await finish('completed'); break;
       }
     },
