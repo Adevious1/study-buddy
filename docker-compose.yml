@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: studybuddy
       POSTGRES_PASSWORD: studybuddy
@@ -20,6 +21,7 @@ services:
       context: .
       dockerfile: apps/server/Dockerfile
       target: dev
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,6 +62,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       target: dev
+    restart: unless-stopped
     depends_on:
       server:
         condition: service_healthy
