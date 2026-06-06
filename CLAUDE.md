@@ -11,13 +11,12 @@ The design spec lives in `docs/superpowers/specs/`.
 ## Status
 
 **SP1 (UI), SP2 (backend + database), SP3 (live voice tutor), SP4 (auth),
-SP5 (billing), and SP6 (session recap) are all done. SP1–SP4 are merged to
-`main`; SP5 is on the `sp5-billing` branch; SP6 is on the `sp6-session-recap`
-branch.**
+SP5 (billing), and SP6 (session recap) are all done. SP7 (camera vision /
+"Show Pip") is implemented, pending its human mic smoke
+(`SP7-manual-smoke.md`). All seven subsystems are merged to `main`; the
+feature branches are deleted.**
 
-**SP7 (camera vision / "Show Pip") is implemented on the
-`worktree-sp7-camera-vision` branch, pending its human mic smoke
-(`SP7-manual-smoke.md`).** During a live voice session a child taps a camera
+SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
 anything they name). The JPEG (downscaled to ≤1024px / q0.85) rides the existing
 SP3 voice WebSocket as a `snapshot` control message; the relay forwards it into
@@ -102,7 +101,7 @@ fallback), `apps/server/src/voice/transcript.ts` (`TranscriptAccumulator`),
 
 The screens, the live audio loop, the auth flow, and the billing flow all require
 a browser (and, for Google/Stripe, real creds); none is smoke-tested in CI. Each
-subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-05-31:
+subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-06-05:
 
 - `SP1-manual-smoke.md` (six screens + dashboard) — ✅ **verified** via Playwright.
 - `SP2-manual-smoke.md` (backend/DB infra: health, schema, migrations, seed, API
@@ -127,6 +126,9 @@ subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-05
   `gemini-3.5-flash` summary → populated `/app/recap`), real session-specific
   recap generated. Required the recap model fix (`gemini-3.5-flash`) and a 30s
   generation timeout; the graceful fallback path is also confirmed.
+- `SP7-manual-smoke.md` (camera vision) — ❌ **pending**: needs a real device +
+  human mic session (happy-path snapshot → Pip reacts, Socratic-on-vision,
+  `offer_camera` pulse, retake/permission-denied, dashboard snapshot panel).
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
@@ -175,18 +177,18 @@ implementation cycle. **Do not collapse these into one effort.**
 5. **Billing** ✓ _done_ — Stripe seat-based subscription, no-card trial on sign-up,
    public signature-verified webhook, entitlement gating (`/app` → `/subscribe`
    client-side; voice + add-child → 402 server-side) with `/dashboard` kept
-   reachable to pay; seat quantity synced to child count. (On `sp5-billing`.)
+   reachable to pay; seat quantity synced to child count.
 6. **Session recap** ✓ _done_ — post-session Gemini summary (`gemini-3-flash-preview`)
    into the existing recap UI; transcript persistence (new `sessions.transcript`
    jsonb); tunable recap prompt (`study-buddy-recap.md`); generate-then-reveal UX
-   (wrapping-up screen → `/app/recap`). (On `sp6-session-recap`.)
+   (wrapping-up screen → `/app/recap`).
 7. **Camera vision ("Show Pip")** ✓ _implemented_ — snapshot-on-demand: a child
    shows Pip a photo during a live session; the JPEG rides the SP3 voice WS and is
    forwarded into the same Gemini Live session (`sendRealtimeInput({ video })`),
    persisted as `session_snapshots` (Postgres `bytea`); preview+confirm capture;
    `offer_camera` tool lets Pip invite the camera; Socratic-on-vision prompt rule;
    guardian dashboard viewer behind `childContext` authz. Pending human mic smoke
-   (`SP7-manual-smoke.md`). (On `worktree-sp7-camera-vision`.)
+   (`SP7-manual-smoke.md`).
 
 ## Planned layout (pnpm monorepo)
 
