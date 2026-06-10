@@ -93,6 +93,12 @@ describe('buildSystemInstruction (built-in template, default path)', () => {
     const out = await buildSystemInstruction(inputWithTrait);
     expect(out).not.toMatch(/^#/m);
   });
+
+  it('includes the private director-cue rule', async () => {
+    const out = await buildSystemInstruction(inputWithTrait);
+    expect(out).toContain('director cue');
+    expect(out).toContain('not the child speaking');
+  });
 });
 
 describe('intro token (first-session gating)', () => {
