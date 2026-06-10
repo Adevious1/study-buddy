@@ -118,9 +118,13 @@ fallback), `apps/server/src/voice/transcript.ts` (`TranscriptAccumulator`),
 `finalizeLiveSession`, and relay `finish()`; client changes span `VoiceRoute`,
 `useVoiceSession`, and `voiceReducer`.
 
-The screens, the live audio loop, the auth flow, and the billing flow all require
-a browser (and, for Google/Stripe, real creds); none is smoke-tested in CI. Each
-subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-06-10:
+CI (`.github/workflows/ci.yml`, added 2026-06-10) runs on every push/PR to `main`:
+a **build** job (`pnpm -r typecheck` + `pnpm -r build`) and a **test** job (`bun test`
+in `apps/server`, 130 tests, against a `postgres:16` service — the suite
+self-provisions `studybuddy_test`, no secrets needed). The screens, the live audio
+loop, the auth flow, and the billing flow still require a browser (and, for
+Google/Stripe, real creds) and are **not** covered by CI — each has a manual-smoke
+doc under `docs/superpowers/`; status as of 2026-06-10:
 
 - `SP1-manual-smoke.md` (six screens + dashboard) — ✅ **verified** via Playwright.
 - `SP2-manual-smoke.md` (backend/DB infra: health, schema, migrations, seed, API
