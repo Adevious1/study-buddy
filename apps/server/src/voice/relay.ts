@@ -171,9 +171,20 @@ export function createRelay(opts: RelayOptions) {
       state = 'live';
       sink.sendControl({ type: 'ready' });
       sink.sendControl({ type: 'status', state: 'live' });
-      capTimer = setTimeout(() => { void finish('completed'); }, opts.softCapMs ?? SOFT_CAP_MS);
+      const cap = opts.softCapMs ?? SOFT_CAP_MS;
+      const lead = opts.nudgeLeadMs ?? NUDGE_LEAD_MS;
+      capTimer = setTimeout(() => { void finish('completed'); }, cap);
       // Do not let the soft-cap timer keep the process alive on its own (matters in tests).
       capTimer.unref?.();
+      // A couple minutes before the hard cap, privately nudge Pip to start wrapping up.
+      // Best-effort: skipped if the session isn't live (e.g. mid-reconnect 'resuming' or
+      // already ended). Math.max guards the rare lead >= cap case (fires immediately).
+      nudgeTimer = setTimeout(() => {
+        if (state === 'live') {
+          try { session?.sendText(WRAP_UP_CUE); } catch { /* best-effort cue */ }
+        }
+      }, Math.max(0, cap - lead));
+      nudgeTimer.unref?.();
     } catch {
       state = 'idle';
       sink.sendControl({ type: 'error', code: 'gemini-unavailable', message: 'Pip could not start.' });
@@ -184,6 +195,7 @@ export function createRelay(opts: RelayOptions) {
     if (state === 'ended') return;
     state = 'ended';
     if (capTimer) { clearTimeout(capTimer); capTimer = null; }
+    if (nudgeTimer) { clearTimeout(nudgeTimer); nudgeTimer = null; }
     try { await session?.close(); } catch { /* ignore */ }
     const turns = transcript.turns();
     // If a DB write below throws, the row stays in_progress (never surfaces as a
