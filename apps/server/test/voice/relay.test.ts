@@ -299,6 +299,22 @@ describe('voice relay', () => {
     expect(recapGen.calls[0].script).toContain('VoiceTester: After reset');
   });
 
+  it('sends a wrap-up director cue shortly before the cap', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({
+      childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out,
+      softCapMs: 200, nudgeLeadMs: 150, // nudge at ~50ms, cap at 200ms
+    });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+    await fake.events();
+
+    await new Promise((r) => setTimeout(r, 100)); // nudge has fired; cap has not
+    expect(fake.sent.text.some((t) => t.includes('director cue'))).toBe(true);
+
+    await relay.handleControl({ type: 'end' }); // cancel the pending cap timer
+  });
+
   it('after exhausting reconnect retries, emits connection-lost and finalizes the session', async () => {
     let calls = 0;
     let captured: import('../../src/voice/geminiSession').GeminiEvents | null = null;
