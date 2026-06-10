@@ -272,6 +272,33 @@ describe('voice relay', () => {
     expect(out.control.find((m) => m.type === 'status' && (m as { state: string }).state === 'ended')).toBeTruthy();
   });
 
+  it('keeps the transcript across a reconnect and includes both halves in the recap', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const recapGen = makeFakeRecapGenerator({
+      figuredOut: [], solvedSelf: 0, solvedTotal: 0, starsEarned: 1,
+      insightTitle: 't', insightBody: 'b', insightBadge: 'B',
+    });
+    const relay = createRelay({
+      childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out, recapGenerator: recapGen,
+    });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+
+    const ev1 = await fake.events();
+    ev1.onResumptionHandle('h');
+    ev1.onOutputTranscript('Before reset', true);
+    ev1.onClose('reset');
+    await tick();
+
+    const ev2 = fake.latestEvents()!; // the post-reconnect session's events
+    ev2.onInputTranscript('After reset', true);
+
+    await relay.handleControl({ type: 'end' });
+
+    expect(recapGen.calls[0].script).toContain('Pip: Before reset');
+    expect(recapGen.calls[0].script).toContain('VoiceTester: After reset');
+  });
+
   it('after exhausting reconnect retries, emits connection-lost and finalizes the session', async () => {
     let calls = 0;
     let captured: import('../../src/voice/geminiSession').GeminiEvents | null = null;
