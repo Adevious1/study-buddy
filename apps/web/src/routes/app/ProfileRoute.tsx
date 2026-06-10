@@ -134,12 +134,16 @@ export function ProfileRoute() {
     );
   }
 
-  if (!studentQ.data || !profileQ.data || !weekQ.data) {
+  // profileQ.data is intentionally nullable: a brand-new child has no learning
+  // profile until their first session generates one (the API 404s → null). Treat
+  // that as "loaded, empty" and only block rendering on student/week, which always
+  // exist. (Real, non-404 profile errors still surface above via profileQ.isError.)
+  if (!studentQ.data || !weekQ.data) {
     return <div className="min-h-full bg-bg" />;
   }
 
   const student = studentQ.data;
-  const profile = profileQ.data;
+  const profile = profileQ.data; // LearningProfile | null
   const week = weekQ.data;
 
   // Brand accent stays fixed (coral) per the spec; only Pip follows pipColorValue.
@@ -215,28 +219,40 @@ export function ProfileRoute() {
       {/* How I learn best */}
       <div style={{ padding: '14px 16px 4px' }}>
         <SectionTitle>How I learn best</SectionTitle>
-        <div className="flex flex-col gap-2">
-          {profile.traits.map((trait) => (
-            <StyleBadge
-              key={trait.traitId}
-              label={trait.label}
-              score={trait.score}
-              color={traitColorVar(traitColor(trait.traitId))}
-              icon={TRAIT_ICONS[trait.traitId] ?? null}
-            />
-          ))}
-        </div>
-        <div
-          className="font-body font-semibold text-ink-3"
-          style={{
-            fontSize: 11.5,
-            marginTop: 10,
-            padding: '0 4px',
-            lineHeight: 1.4,
-          }}
-        >
-          {profile.note}
-        </div>
+        {profile && profile.traits.length > 0 ? (
+          <>
+            <div className="flex flex-col gap-2">
+              {profile.traits.map((trait) => (
+                <StyleBadge
+                  key={trait.traitId}
+                  label={trait.label}
+                  score={trait.score}
+                  color={traitColorVar(traitColor(trait.traitId))}
+                  icon={TRAIT_ICONS[trait.traitId] ?? null}
+                />
+              ))}
+            </div>
+            <div
+              className="font-body font-semibold text-ink-3"
+              style={{
+                fontSize: 11.5,
+                marginTop: 10,
+                padding: '0 4px',
+                lineHeight: 1.4,
+              }}
+            >
+              {profile.note}
+            </div>
+          </>
+        ) : (
+          <div
+            className="font-body font-semibold text-ink-3"
+            style={{ fontSize: 11.5, marginTop: 4, padding: '0 4px', lineHeight: 1.4 }}
+          >
+            Pip is still getting to know {student.name}. After a few sessions together,
+            this is where you'll see how they learn best.
+          </div>
+        )}
       </div>
 
       {/* This week's streak */}

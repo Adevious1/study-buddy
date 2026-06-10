@@ -108,8 +108,56 @@ endpoints the UI uses (not assumed).
 | Re-login (dev path) | ✅ back to `/app` as the seed guardian |
 
 **Not covered:** the full **Google OAuth** completion (needs real `GOOGLE_CLIENT_ID`/
-`SECRET`) and the brand-new-guardian **onboarding** flow (PIN-set → add first child),
-which requires a fresh guardian — the dev seed guardian already has a PIN + child.
+`SECRET` + a stable registered redirect URL — see the 2026-06-10 entry below).
+
+## Last verified (2026-06-10, onboarding path, via Playwright)
+
+Covered the previously-uncovered **fresh-guardian onboarding** flow by simulating a
+fresh guardian on the dev path: deleted the seed guardian's children (cascades),
+keeping the guardian + better-auth user so dev-login still works and
+`nextOnboardingDest` returns `/onboarding`. (Faithful proxy for the onboarding
+**screens**; it does NOT exercise the production better-auth `user.create` hook that
+mints a guardian on first Google sign-in — that still needs real OAuth.)
+
+| Check | Result |
+|---|---|
+| Gate `/app` → `/login` | ✅ |
+| Dev login w/ 0 children → `/onboarding` | ✅ PIN step |
+| PIN `12` (too short) | ✅ "PIN must be 4 digits.", no advance |
+| PIN `5678` → add-child step | ✅ |
+| Add-child empty submit | ✅ blocked (guard `!name \|\| !birthDate`) |
+| Add child "Theo" → `/app` | ✅ "Hi Theo!", 0 streak |
+| **`/app/me` for new (profile-less) child** | ❌→✅ **was BLANK; fixed** (see below) |
+| `/switch` picker | ✅ Theo + add (+) |
+| Add 2nd child "Mia" → active | ✅ "Hi Mia!" |
+| Switch back to Theo | ✅ "Hi Theo!" |
+| Dashboard gate, old seed PIN `1234` | ✅ "Wrong PIN." (onboarding PIN replaced it) |
+| Dashboard gate, onboarding PIN `5678` | ✅ dashboard renders |
+
+**Bug found + fixed in this run — `ProfileRoute` blanked for a profile-less child:**
+`getLearningProfile()` returns `null` on 404 (a brand-new child has no learning
+profile until their first session), but `ProfileRoute.tsx` treated "loaded but null"
+identically to "still loading" and rendered a permanent blank screen — making the
+`/app/me` tab (and the "Switch profile" button it hosts) dead for every freshly
+onboarded/added child. The seed child Maya always had a seeded profile, so the
+2026-05-31 run never hit it. Fixed: a null profile is now a valid loaded state
+(renders the page + a placeholder under "How I learn best"). Re-verified in-browser
+for Theo; `pnpm --filter @study-buddy/web typecheck` clean.
+
+**Env gotchas hit (relevant to any localhost browser smoke):** the `.env` in use
+points `BETTER_AUTH_URL` at an **https cloudflared tunnel**, so better-auth issues
+`__Secure-…; Secure` session cookies that a browser on **http://localhost won't
+store** — localhost dev-login silently fails. And the running **web** container had
+`TUNNEL_BASIC_AUTH` baked in (localhost → 401). For localhost smoke, swap to
+`.env.localhost.bak` (`BETTER_AUTH_URL=http://localhost:5173`, no `TUNNEL_BASIC_AUTH`)
+and `docker compose up -d --force-recreate server web`. Both were restored to the
+tunnel config + re-seeded (Maya, PIN `1234`) after this run.
+
+**Still not covered:** real **Google OAuth** completion + the production guardian-
+creation hook — needs real `GOOGLE_CLIENT_ID`/`SECRET` and a *stable* registered
+redirect URL (`{BETTER_AUTH_URL}/api/auth/callback/google`); a quick-tunnel hostname
+that regenerates each restart breaks the registered redirect. Tabled with the
+production-deploy work.
 
 > Driver note: Playwright renumbers element refs on every navigation, so snapshot
 > **immediately before each click** and use that snapshot's ref (or drive by
