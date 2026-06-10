@@ -171,16 +171,22 @@ Audit-only changes in `useVoiceSession.ts` / `VoiceRoute.tsx`:
 
 ## Testing
 
-Server-heavy and unit-testable via the injectable fake in
-`apps/server/src/voice/fakeGeminiSession.ts` (`makeFakeGemini`). **There are no relay
-tests today** — the fake is already built but currently unused by any test, so this
-effort introduces `apps/server/src/voice/relay.test.ts` as the first relay coverage.
-The fake must be **extended** to support reconnect: today its `connector` resolves a
-one-time events promise and returns a single shared session. It needs to (a) accept
-**multiple** `connect` calls, wiring fresh `events` and recording each call's
-`resumptionHandle`, and (b) let a test trigger `onClose` on demand.
+Server-heavy and unit-testable via the injectable fake `makeFakeGemini`
+(`apps/server/src/voice/fakeGeminiSession.ts`), already used by the existing
+`apps/server/test/voice/relay.test.ts` (10 tests). New cases are **added** to that
+file. DB-backed (the relay's `start`/`finish` hit Postgres): bootstrap with
+`ensureTestDb`/`setDatabaseUrl`/`migrateAndSeedTestDb` + `ensureVoiceTestChild()` /
+`VOICE_TEST_CHILD_ID`, exactly as the existing relay tests do — run against the
+throwaway test Postgres (`PG_TEST_HOST=localhost PG_TEST_PORT=5433 bun test`).
 
-Relay tests (new `relay.test.ts`):
+The fake must be **extended** for reconnect: today its `connector` resolves a
+one-time events promise and returns a single shared session. Add (a) a per-connect
+options log + connect count so a test can assert the **2nd** connect carried the
+resumption handle, and (b) a `latestEvents()` accessor so a test can drive the
+**post-reconnect** session's events (the existing `events()` still returns the first
+connect's events, keeping current tests unchanged).
+
+Relay tests (added to `relay.test.ts`):
 1. Unexpected `onClose` while live → emits `status: resuming` then `status: live`;
    the **2nd** connect carried the latest `resumptionHandle`.
 2. Transcript accumulated before **and** after a reconnect is intact in the
@@ -191,8 +197,9 @@ Relay tests (new `relay.test.ts`):
 5. `onClose` with no handle → `finish('completed')`, no reconnect.
 6. Nudge: with a short test cap, the `nudgeTimer` sends the director-cue text
    exactly once while live.
-7. Prompt drift-guard: `study-buddy.md` ⇄ `BUILTIN_TEMPLATE` byte-identical
-   (existing test, must stay green after the rule is added).
+7. Prompt drift-guard: `study-buddy.md` ⇄ `BUILTIN_TEMPLATE` byte-identical — the
+   existing guard at `test/voice/systemPrompt.test.ts:148` must stay green after the
+   director-cue rule is added to **both** files.
 
 **Manual smoke** (`docs/superpowers/SP8-manual-smoke.md`, like SP3/SP6): a human mic
 run confirming a >10-min session survives the real Gemini reset (brief "one sec…",
@@ -203,12 +210,13 @@ cleanly into `/app/recap`. Not CI-covered (needs a mic + real Gemini).
 
 - `apps/server/src/voice/relay.ts` — `connectGemini()` extraction, `reconnect()`,
   `onClose` handler, `nudgeTimer`, `SOFT_CAP_MS` → 15 min.
-- `apps/server/src/voice/fakeGeminiSession.ts` — extend for multiple connects +
-  on-demand `onClose` trigger + per-connect handle capture.
+- `apps/server/src/voice/fakeGeminiSession.ts` — extend for multiple connects
+  (per-connect options log + `latestEvents()` accessor).
 - `apps/server/study-buddy.md` + the `BUILTIN_TEMPLATE` in
-  `apps/server/src/voice/systemPrompt.ts` — the director-cue rule (byte-identical).
-- `apps/server/src/voice/relay.test.ts` — **new file** (first relay test coverage)
-  with the cases above.
+  `apps/server/src/voice/systemPrompt.ts` — the director-cue rule (kept
+  byte-identical; the `systemPrompt.test.ts` drift guard enforces this).
+- `apps/server/test/voice/relay.test.ts` — **add** the reconnect/nudge cases to the
+  existing file.
 - `apps/web/src/voice/useVoiceSession.ts` / `routes/app/VoiceRoute.tsx` —
   audit-only, change only if the audit finds a `'resuming'` gap.
 - `docs/superpowers/SP8-manual-smoke.md` — new manual smoke checklist.
