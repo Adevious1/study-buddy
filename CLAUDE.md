@@ -13,8 +13,9 @@ The design spec lives in `docs/superpowers/specs/`.
 **SP1 (UI), SP2 (backend + database), SP3 (live voice tutor), SP4 (auth),
 SP5 (billing), and SP6 (session recap) are all done. SP7 (camera vision /
 "Show Pip") is implemented, pending its human mic smoke
-(`SP7-manual-smoke.md`). All seven subsystems are merged to `main`; the
-feature branches are deleted.**
+(`SP7-manual-smoke.md`). SP8 (reconnect / longer sessions) is implemented,
+pending its human mic smoke (`SP8-manual-smoke.md`). All eight subsystems are
+merged to `main`; the feature branches are deleted.**
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
@@ -35,6 +36,24 @@ Key files: `apps/server/src/voice/snapshots.ts`, `routes/snapshots.ts`, the
 and client `SnapshotCapture.tsx` / `imageEncode.ts` / `useVoiceSession` /
 `VoiceRoute` / the dashboard panel. **Single JPEG for both Pip and storage**
 (webp storage and child-recap thumbnails are deferred).
+
+SP8 (reconnect / longer sessions): transparent relay↔Gemini reconnect across
+Gemini's ~10-min connection reset, using the Gemini session-resumption handle.
+When Gemini drops the relay's connection the relay reconnects immediately;
+the browser sees a brief `'resuming'` state ("one sec…") then `'live'`, while
+the browser↔relay WebSocket stays open throughout. The session soft-cap is
+raised from 10 to a 15-min policy (within Gemini's uncompressed audio-session
+limit; no context compression). A ~13-min in-band "director cue" nudges Pip
+to wrap up the session (tunable via `study-buddy.md`, byte-identical
+`BUILTIN_TEMPLATE`, drift-guard test). Bounded reconnect retries fall back to
+a graceful completed recap on persistent failure. The browser↔relay
+(child-network) reconnect — surviving the child's own WebSocket dropping — is
+still deferred. Key files: `apps/server/src/voice/relay.ts`
+(`connectGemini`/`reconnect`/`onClose`, nudge scheduling),
+`apps/server/src/voice/geminiSession.ts` (resumption handle), the
+director-cue rule in `study-buddy.md`, and `test/voice/relay.test.ts` +
+`test/voice/systemPrompt.test.ts`. Pending human mic smoke
+(`SP8-manual-smoke.md`).
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -101,7 +120,7 @@ fallback), `apps/server/src/voice/transcript.ts` (`TranscriptAccumulator`),
 
 The screens, the live audio loop, the auth flow, and the billing flow all require
 a browser (and, for Google/Stripe, real creds); none is smoke-tested in CI. Each
-subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-06-05:
+subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-06-10:
 
 - `SP1-manual-smoke.md` (six screens + dashboard) — ✅ **verified** via Playwright.
 - `SP2-manual-smoke.md` (backend/DB infra: health, schema, migrations, seed, API
@@ -129,13 +148,17 @@ subsystem has a manual-smoke doc under `docs/superpowers/`; status as of 2026-06
 - `SP7-manual-smoke.md` (camera vision) — ❌ **pending**: needs a real device +
   human mic session (happy-path snapshot → Pip reacts, Socratic-on-vision,
   `offer_camera` pulse, retake/permission-denied, dashboard snapshot panel).
+- `SP8-manual-smoke.md` (reconnect / longer sessions) — ❌ **pending**: needs a
+  real device + human mic session crossing the ~10-min Gemini connection reset
+  (brief `'resuming'` flash, seamless audio continuation, director-cue nudge,
+  fallback-to-recap on retry exhaustion).
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
 **Deferred to a later effort:** LLM-written profile notes, interactive hint chips,
-true subjectless free-talk, and transparent mid-session reconnect across Gemini's
-~10-min connection reset (the soft-cap + abandoned-on-disconnect paths ARE
-implemented; the seamless resumption reconnect is the remaining seam).
+true subjectless free-talk, and the browser↔relay (child-network) reconnect —
+surviving the child's own WebSocket dropping (relay session persistence +
+browser re-attach).
 
 ## Architecture (committed decisions)
 
@@ -189,6 +212,14 @@ implementation cycle. **Do not collapse these into one effort.**
    `offer_camera` tool lets Pip invite the camera; Socratic-on-vision prompt rule;
    guardian dashboard viewer behind `childContext` authz. Pending human mic smoke
    (`SP7-manual-smoke.md`).
+8. **Reconnect / longer sessions** ✓ _implemented_ — transparent relay↔Gemini
+   reconnect via the Gemini session-resumption handle across Gemini's ~10-min
+   connection reset (browser↔relay WS stays open; browser sees a brief
+   `'resuming'` then `'live'`); session soft-cap raised to 15 min; a ~13-min
+   in-band director-cue nudge (tunable via `study-buddy.md`) prompts Pip to
+   wrap up; bounded retries fall back to a graceful completed recap. The
+   browser↔relay (child-network) reconnect remains deferred. Pending human mic
+   smoke (`SP8-manual-smoke.md`).
 
 ## Planned layout (pnpm monorepo)
 
