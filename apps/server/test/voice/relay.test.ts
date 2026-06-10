@@ -257,4 +257,46 @@ describe('voice relay', () => {
 
     expect(fake.connectCount()).toBe(1); // never reconnected
   });
+
+  it('ends gracefully (no reconnect) when Gemini closes before any resumption handle', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+    const ev = await fake.events();
+
+    ev.onClose('reset'); // no handle was ever delivered
+    await tick();
+
+    expect(fake.connectCount()).toBe(1); // no reconnect attempted
+    expect(out.control.find((m) => m.type === 'status' && (m as { state: string }).state === 'ended')).toBeTruthy();
+  });
+
+  it('after exhausting reconnect retries, emits connection-lost and finalizes the session', async () => {
+    let calls = 0;
+    let captured: import('../../src/voice/geminiSession').GeminiEvents | null = null;
+    const session = {
+      sendAudio() {}, sendImage() {}, sendText() {}, ackTool() {}, audioStreamEnd() {},
+      close: async () => {},
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const connector = async (_o: any, e: any) => {
+      calls += 1;
+      if (calls === 1) { captured = e; return session as any; }
+      throw new Error('gemini down'); // every reconnect fails
+    };
+    const out = sink();
+    const relay = createRelay({
+      childId: VOICE_TEST_CHILD_ID, connector: connector as never, sink: out,
+      reconnectBackoffsMs: [1, 1], // fast retries
+    });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+    captured!.onResumptionHandle('h');
+    captured!.onClose('reset');
+    // 3 attempts + 2×1ms backoffs, then finish() does real DB writes before 'ended'.
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(out.control.find((m) => m.type === 'error' && (m as { code: string }).code === 'connection-lost')).toBeTruthy();
+    expect(out.control.find((m) => m.type === 'status' && (m as { state: string }).state === 'ended')).toBeTruthy();
+  });
 });
