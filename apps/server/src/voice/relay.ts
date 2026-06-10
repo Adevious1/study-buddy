@@ -20,14 +20,22 @@ export interface RelayOptions {
   childId: string;
   connector: GeminiConnector;
   sink: RelaySink;
-  softCapMs?: number; // default 10 min
+  softCapMs?: number; // default 15 min
+  nudgeLeadMs?: number; // default 2 min before the cap
+  reconnectBackoffsMs?: number[]; // default [500, 1500]
   recapGenerator?: RecapGenerator | null;
 }
 
 type State = 'idle' | 'connecting' | 'live' | 'resuming' | 'ended';
 
-const SOFT_CAP_MS = 10 * 60 * 1000;
+const SOFT_CAP_MS = 15 * 60 * 1000; // hard session cap (wall-clock from start)
+const NUDGE_LEAD_MS = 2 * 60 * 1000; // wrap-up nudge fires this long before the cap
+const RECONNECT_BACKOFFS_MS = [500, 1500]; // delays between reconnect attempts (2 retries)
+const WRAP_UP_CUE =
+  '[director cue: about two minutes left — start guiding toward a natural stopping point and a quick recap of what you two figured out.]';
 const MAX_SNAPSHOT_BYTES = 2_000_000; // ~2MB decoded; a 1024px q0.85 JPEG is far smaller
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function createRelay(opts: RelayOptions) {
   const { childId, connector, sink } = opts;
@@ -42,6 +50,8 @@ export function createRelay(opts: RelayOptions) {
   let sessionRowId: string | null = null;
   let resumptionHandle: string | undefined;
   let capTimer: ReturnType<typeof setTimeout> | null = null;
+  let nudgeTimer: ReturnType<typeof setTimeout> | null = null;
+  let systemInstruction = '';
   // True while a Pip turn is mid-stream (deltas still arriving); the leading
   // "Text " artifact is only stripped on the first delta of each turn.
   let pipTurnOpen = false;
@@ -99,9 +109,45 @@ export function createRelay(opts: RelayOptions) {
         session?.ackTool(id, name);
       },
       onResumptionHandle: (handle) => { resumptionHandle = handle; },
-      onClose: () => { /* expected ~10min reset; transport reconnect handled in a later task */ },
+      onClose: () => { if (state === 'live') void reconnect(); },
       onError: () => sink.sendControl({ type: 'error', code: 'gemini-unavailable', message: 'Pip had trouble connecting.' }),
     };
+  }
+
+  function connectGemini(): Promise<GeminiLiveSession> {
+    return connector({ systemInstruction, resumptionHandle }, events());
+  }
+
+  async function reconnect() {
+    // Only the unexpected mid-session Gemini reset reaches here (onClose checks
+    // state === 'live'). Mark 'resuming' so handleAudio drops mic input and the
+    // client shows "one sec…".
+    state = 'resuming';
+    sink.sendControl({ type: 'status', state: 'resuming' });
+    if (!resumptionHandle) {
+      // No handle yet (sub-~1-min session) — context can't be restored; end cleanly.
+      await finish('completed');
+      return;
+    }
+    const backoffs = opts.reconnectBackoffsMs ?? RECONNECT_BACKOFFS_MS;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const next = await connectGemini();
+        // The cap or a child-end may have fired during the await.
+        if ((state as State) === 'ended') { try { await next.close(); } catch { /* ignore */ } return; }
+        session = next;
+        state = 'live';
+        sink.sendControl({ type: 'status', state: 'live' });
+        return;
+      } catch {
+        if (attempt >= backoffs.length) break;
+        await delay(backoffs[attempt]);
+        if ((state as State) === 'ended') return;
+      }
+    }
+    if ((state as State) === 'ended') return;
+    sink.sendControl({ type: 'error', code: 'connection-lost', message: 'Lost connection.' });
+    await finish('completed');
   }
 
   async function start(subjectKind: SubjectKind, topic: string, title: string) {
@@ -109,8 +155,8 @@ export function createRelay(opts: RelayOptions) {
     state = 'connecting';
     meta = { subjectKind, topic };
     try {
-      const systemInstruction = await buildPrompt(subjectKind, topic);
-      session = await connector({ systemInstruction, resumptionHandle }, events());
+      systemInstruction = await buildPrompt(subjectKind, topic);
+      session = await connectGemini();
       sessionRowId = await createLiveSession(childId, subjectKind, title);
       // If the child ended/left while we were still connecting, finish() has
       // already run (it saw a null sessionRowId and skipped the DB). Do NOT go

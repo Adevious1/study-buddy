@@ -28,6 +28,9 @@ function sink() {
   };
 }
 
+/** Let the relay's async reconnect (which awaits connectGemini) settle. */
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
 describe('voice relay', () => {
   it('start → ready, builds prompt from the child, creates a session row', async () => {
     const fake = makeFakeGemini();
@@ -220,5 +223,38 @@ describe('voice relay', () => {
     await relay.handleControl({ type: 'snapshot', mime: 'image/jpeg', data: jpeg });
     expect(out.control).toContainEqual({ type: 'snapshot-ack', ok: false });
     expect(out.control.find((m) => m.type === 'snapshot-ack' && m.ok === true)).toBeFalsy();
+  });
+
+  it('reconnects with the resumption handle on an unexpected Gemini close', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+    const ev = await fake.events();
+
+    ev.onResumptionHandle('handle-xyz');
+    ev.onClose('reset');
+    await tick();
+
+    expect(fake.connectCount()).toBe(2);
+    expect(fake.optionsLog()[1].resumptionHandle).toBe('handle-xyz');
+    const statuses = out.control.filter((m) => m.type === 'status').map((m) => (m as { state: string }).state);
+    expect(statuses).toContain('resuming');
+    expect(statuses[statuses.length - 1]).toBe('live');
+  });
+
+  it('does not reconnect when Gemini closes after the session has ended', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+    const ev = await fake.events();
+    ev.onResumptionHandle('h');
+
+    await relay.handleControl({ type: 'end' }); // finish(): state -> 'ended', closes session
+    ev.onClose('reset');                        // the close finish() triggered
+    await tick();
+
+    expect(fake.connectCount()).toBe(1); // never reconnected
   });
 });
