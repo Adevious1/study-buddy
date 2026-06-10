@@ -1,0 +1,96 @@
+name: CI
+
+# Build + typecheck the whole monorepo, and run the server test suite against a
+# throwaway Postgres. No app secrets are needed: the Stripe/Gemini env reads are
+# all lazy (inside functions), and the test suite creates + migrates + seeds its
+# own `studybuddy_test` database (see apps/server/test/setup.ts).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same ref cancels the older in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+  BUN_VERSION: "1.3.12"
+
+jobs:
+  # Typecheck (tsc --noEmit across shared/web/server) and the production build
+  # (the web Vite build is the only thing typecheck doesn't already cover).
+  build:
+    name: Typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Build
+        run: pnpm -r build
+
+  # Run the Bun-based server test suite (130 tests) against a real Postgres.
+  # The suite self-provisions its database, so the service just has to be up.
+  test:
+    name: Server tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: studybuddy
+          POSTGRES_PASSWORD: studybuddy
+          # No POSTGRES_DB: Postgres creates a `studybuddy` db plus the default
+          # `postgres` admin db that test/setup.ts connects to. Both are needed.
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U studybuddy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run server test suite
+        working-directory: apps/server
+        env:
+          PG_TEST_HOST: localhost
+          PG_TEST_PORT: "5432"
+        run: bun test
