@@ -5,16 +5,26 @@ import type {
 /** A scripted fake: tests grab the captured events object and push messages in. */
 export interface FakeHandle {
   connector: GeminiConnector;
-  /** Resolves once connect() has been called and events are wired. */
+  /** Resolves once the FIRST connect() has wired events (unchanged for existing tests). */
   events(): Promise<GeminiEvents>;
+  /** The most recent connect()'s events — use after a reconnect to drive the new session. */
+  latestEvents(): GeminiEvents | null;
+  /** The most recent connect()'s options. */
   lastOptions(): GeminiConnectOptions | null;
+  /** Every connect()'s options, in call order (index 1 is the first reconnect). */
+  optionsLog(): GeminiConnectOptions[];
+  /** How many times connect() has been called. */
+  connectCount(): number;
+  /** Sends accumulate across ALL connects (one shared session) — a reconnect does not
+   *  reset these; assert on totals, not per-session deltas. */
   sent: { audio: Uint8Array[]; images: string[]; text: string[]; acks: string[]; closed: boolean; audioEnded: boolean };
 }
 
 export function makeFakeGemini(): FakeHandle {
-  let opts: GeminiConnectOptions | null = null;
-  let resolveEvents: (e: GeminiEvents) => void;
-  const eventsPromise = new Promise<GeminiEvents>((r) => { resolveEvents = r; });
+  const optsLog: GeminiConnectOptions[] = [];
+  const eventsLog: GeminiEvents[] = [];
+  let resolveFirst: (e: GeminiEvents) => void;
+  const firstEventsP = new Promise<GeminiEvents>((r) => { resolveFirst = r; });
   const sent = { audio: [] as Uint8Array[], images: [] as string[], text: [] as string[], acks: [] as string[], closed: false, audioEnded: false };
 
   const session: GeminiLiveSession = {
@@ -27,14 +37,19 @@ export function makeFakeGemini(): FakeHandle {
   };
 
   const connector: GeminiConnector = async (o, e) => {
-    opts = o; resolveEvents(e);
+    optsLog.push(o);
+    eventsLog.push(e);
+    if (eventsLog.length === 1) resolveFirst(e);
     return session;
   };
 
   return {
     connector,
-    events: () => eventsPromise,
-    lastOptions: () => opts,
+    events: () => firstEventsP,
+    latestEvents: () => eventsLog[eventsLog.length - 1] ?? null,
+    lastOptions: () => optsLog[optsLog.length - 1] ?? null,
+    optionsLog: () => optsLog,
+    connectCount: () => optsLog.length,
     sent,
   };
 }
