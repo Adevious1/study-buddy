@@ -153,7 +153,7 @@ export function VoiceRoute() {
   }, [state.status, state.error, navigate]);
 
   const accent = 'var(--color-coral)';
-  const pipState = state.status === 'live' ? 'listen' : state.status === 'connecting' ? 'think' : 'idle';
+  const pipState = state.status === 'live' ? 'listen' : (state.status === 'connecting' || state.status === 'resuming') ? 'think' : 'idle';
   const subjectTitle = useMemo(() => picked?.title ?? 'Talk with Pip', [picked]);
   // Once there are messages, switch to the compact layout (small Pip up top,
   // transcript fills the rest) so long turns are readable instead of clipped.
