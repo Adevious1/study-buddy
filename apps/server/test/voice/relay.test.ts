@@ -31,6 +31,23 @@ function sink() {
 /** Let the relay's async reconnect (which awaits connectGemini) settle. */
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
+/**
+ * Poll until `pred` holds. Use instead of a fixed `tick()` when asserting on the
+ * completion of a fire-and-forget async chain (e.g. onClose → reconnect →
+ * finish(), which awaits recap generation + two DB round-trips). A single tick is
+ * enough with sub-ms localhost Postgres but races against a CI service container.
+ */
+async function waitFor(pred: () => boolean, timeoutMs = 2000): Promise<void> {
+  const start = Date.now();
+  while (!pred()) {
+    if (Date.now() - start > timeoutMs) throw new Error('waitFor: condition not met in time');
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
+const hasEnded = (out: ReturnType<typeof sink>) =>
+  out.control.some((m) => m.type === 'status' && (m as { state: string }).state === 'ended');
+
 describe('voice relay', () => {
   it('start → ready, builds prompt from the child, creates a session row', async () => {
     const fake = makeFakeGemini();
@@ -266,10 +283,12 @@ describe('voice relay', () => {
     const ev = await fake.events();
 
     ev.onClose('reset'); // no handle was ever delivered
-    await tick();
 
+    // onClose → reconnect → finish() is fire-and-forget; wait for its 'ended'
+    // rather than a single tick (which races the recap + DB writes on CI).
+    await waitFor(() => hasEnded(out));
     expect(fake.connectCount()).toBe(1); // no reconnect attempted
-    expect(out.control.find((m) => m.type === 'status' && (m as { state: string }).state === 'ended')).toBeTruthy();
+    expect(hasEnded(out)).toBeTruthy();
   });
 
   it('keeps the transcript across a reconnect and includes both halves in the recap', async () => {
