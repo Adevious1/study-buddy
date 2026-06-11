@@ -99,6 +99,15 @@ describe('buildSystemInstruction (built-in template, default path)', () => {
     expect(out).toContain('director cue');
     expect(out).toContain('not the child speaking');
   });
+
+  it('forbids claiming to see a picture before one actually arrives (anti-confabulation)', async () => {
+    // Regression guard for the SP7 smoke finding: the native-audio model would
+    // role-play "I can see it now!" the moment the child mentioned the camera,
+    // before any image was forwarded. The prompt must explicitly forbid that.
+    const out = await buildSystemInstruction(inputWithTrait);
+    expect(out).toContain('Until a picture has truly arrived, you have not seen anything');
+    expect(out).toContain('NEVER say "I can see it"');
+  });
 });
 
 describe('intro token (first-session gating)', () => {
