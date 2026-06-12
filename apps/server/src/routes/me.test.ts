@@ -5,7 +5,7 @@ import { makeGuardian, signInGuardian } from '../../test/authHarness';
 import type { MeResponse } from '@study-buddy/shared';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { children, guardians, sessions, sessionSnapshots } from '../db/schema';
+import { children, guardians, sessions, sessionSnapshots, session } from '../db/schema';
 
 describe('GET /api/me', () => {
   beforeAll(async () => {
@@ -260,6 +260,38 @@ describe('PIN change', () => {
       body: JSON.stringify({ pin: '1111' }),
     });
     expect(oldPin.status).toBe(401);
+  });
+});
+
+describe('POST /api/me/pin/reset', () => {
+  it('resets with a fresh session', async () => {
+    const { cookie } = await makeGuardian(`reset-${Date.now()}@test.dev`);
+    const res = await app.request('/api/me/pin/reset', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPin: '4321' }),
+    });
+    expect(res.status).toBe(204);
+    const verify = await app.request('/api/me/pin/verify', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: '4321' }),
+    });
+    expect(verify.status).toBe(204);
+  });
+
+  it('403s with a stale session', async () => {
+    const { cookie, guardianId } = await makeGuardian(`stale-${Date.now()}@test.dev`);
+    const [g] = await db.select().from(guardians).where(eq(guardians.id, guardianId));
+    await db.update(session)
+      .set({ createdAt: new Date(Date.now() - 10 * 60_000) })
+      .where(eq(session.userId, g.userId!));
+    const res = await app.request('/api/me/pin/reset', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPin: '4321' }),
+    });
+    expect(res.status).toBe(403);
   });
 });
 

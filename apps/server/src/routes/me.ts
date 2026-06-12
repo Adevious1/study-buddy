@@ -8,6 +8,7 @@ import { guardianContext, type GuardianVariables } from '../lib/guardianContext'
 import { isLocked, recordFail, clearFails } from '../lib/pinLockout';
 import { getEntitlement, syncSeatQuantity } from '../lib/billing';
 import { deleteAccount, StripeCancelError } from '../lib/accountLifecycle';
+import { auth } from '../lib/auth';
 import type { MeResponse } from '@study-buddy/shared';
 
 export const meRoute = new Hono<{ Variables: GuardianVariables }>();
@@ -78,6 +79,30 @@ meRoute.put('/pin', async (c) => {
   clearFails(g.id);
   const pinHash = await Bun.password.hash(parsed.data.newPin);
   await db.update(guardians).set({ pinHash }).where(eq(guardians.id, g.id));
+  return c.body(null, 204);
+});
+
+// A session is "fresh" if created within this window. The forgot-PIN flow signs
+// the guardian out and back in, so a legit reset always has a seconds-old
+// session. A kid holding the family browser's days-old session must not be able
+// to replace the PIN — that's the entire property the PIN provides.
+const PIN_RESET_MAX_SESSION_AGE_MS = 5 * 60_000;
+
+meRoute.post('/pin/reset', async (c) => {
+  const g = c.get('guardian');
+  const sess = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!sess) return c.json({ error: { code: 'unauthenticated', message: 'Sign in required' } }, 401);
+  const age = Date.now() - new Date(sess.session.createdAt).getTime();
+  if (age > PIN_RESET_MAX_SESSION_AGE_MS) {
+    return c.json({ error: { code: 'stale_session', message: 'Please sign in again to reset your PIN' } }, 403);
+  }
+  const parsed = pinSchema.safeParse(
+    await c.req.json().then((j) => ({ pin: (j as { newPin?: string })?.newPin })).catch(() => null),
+  );
+  if (!parsed.success) return c.json({ error: { code: 'invalid_pin', message: 'PIN must be 4 digits' } }, 400);
+  const pinHash = await Bun.password.hash(parsed.data.pin);
+  await db.update(guardians).set({ pinHash }).where(eq(guardians.id, g.id));
+  clearFails(g.id);
   return c.body(null, 204);
 });
 
