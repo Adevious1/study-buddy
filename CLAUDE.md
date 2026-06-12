@@ -14,8 +14,10 @@ The design spec lives in `docs/superpowers/specs/`.
 SP5 (billing), and SP6 (session recap) are all done. SP7 (camera vision /
 "Show Pip") is implemented, pending its human mic smoke
 (`SP7-manual-smoke.md`). SP8 (reconnect / longer sessions) is implemented,
-pending its human mic smoke (`SP8-manual-smoke.md`). All eight subsystems are
-merged to `main`; the feature branches are deleted.**
+pending its human mic smoke (`SP8-manual-smoke.md`). SP9 (account lifecycle
+& compliance) is implemented, pending its human smoke
+(`SP9-manual-smoke.md`). All nine subsystems are merged to `main`; the
+feature branches are deleted.**
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
@@ -54,6 +56,24 @@ still deferred. Key files: `apps/server/src/voice/relay.ts`
 director-cue rule in `study-buddy.md`, and `test/voice/relay.test.ts` +
 `test/voice/systemPrompt.test.ts`. Pending human mic smoke
 (`SP8-manual-smoke.md`).
+
+SP9 (account lifecycle & compliance): guardian settings page at
+`/dashboard/settings` behind the PIN gate — edit child (name/grade/Pip
+color); delete child with a typed-name confirm modal, cascade wipe of all
+child data, and Stripe seat decrement; delete account with a typed-`DELETE`
+confirm, Stripe cancel-first then auth-user cascade delete, signs the
+guardian out everywhere and lands on `/goodbye`; PIN change (with 429
+lockout on wrong attempts) and a fresh-session (≤5 min) Forgot-PIN reset
+(`/pin-reset`) that restarts sign-in if the session is stale; `POST /pin`
+hardened to first-set-only (rejects re-set via the API); parental-consent
+checkbox on the add-child form stamping `children.consent_at`; and public
+`/privacy` + `/terms` pages with a consent line on the login screen. Key
+files: `apps/server/src/routes/me.ts`,
+`apps/server/src/lib/accountLifecycle.ts`,
+`apps/web/src/routes/dashboard/DashboardSettingsRoute.tsx`,
+`apps/web/src/components/ChildForm.tsx` / `ConfirmDangerModal.tsx`,
+`apps/web/src/routes/auth/PinResetRoute.tsx` / `GoodbyeRoute.tsx`, and the
+legal routes. Pending human smoke (`SP9-manual-smoke.md`).
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -120,7 +140,7 @@ fallback), `apps/server/src/voice/transcript.ts` (`TranscriptAccumulator`),
 
 CI (`.github/workflows/ci.yml`, added 2026-06-10) runs on every push/PR to `main`:
 a **build** job (`pnpm -r typecheck` + `pnpm -r build`) and a **test** job (`bun test`
-in `apps/server`, 130 tests, against a `postgres:16` service — the suite
+in `apps/server`, 152 tests, against a `postgres:16` service — the suite
 self-provisions `studybuddy_test`, no secrets needed). The screens, the live audio
 loop, the auth flow, and the billing flow still require a browser (and, for
 Google/Stripe, real creds) and are **not** covered by CI — each has a manual-smoke
@@ -156,6 +176,9 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
   real device + human mic session crossing the ~10-min Gemini connection reset
   (brief `'resuming'` flash, seamless audio continuation, director-cue nudge,
   fallback-to-recap on retry exhaustion).
+- `SP9-manual-smoke.md` (account lifecycle & compliance) — ❌ **pending**: needs a
+  browser + running stack (localhost env) to walk the settings, edit/delete child,
+  delete account, PIN change, forgot-PIN, consent checkbox, and legal pages.
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
@@ -229,6 +252,14 @@ implementation cycle. **Do not collapse these into one effort.**
    wrap up; bounded retries fall back to a graceful completed recap. The
    browser↔relay (child-network) reconnect remains deferred. Pending human mic
    smoke (`SP8-manual-smoke.md`).
+9. **Account lifecycle & compliance** ✓ _implemented_ — guardian settings page
+   (`/dashboard/settings`) behind the PIN gate: edit child (name/grade/color),
+   delete child (typed-name confirm + cascade wipe + Stripe seat decrement),
+   delete account (typed-`DELETE` confirm, Stripe cancel then auth-user cascade,
+   signs out everywhere, `/goodbye`); PIN change with lockout; Forgot-PIN
+   (`/pin-reset`) with stale-session restart; `POST /pin` first-set-only; parental
+   consent checkbox stamping `children.consent_at`; public `/privacy` + `/terms`
+   with login consent line. Pending human smoke (`SP9-manual-smoke.md`).
 
 ## Planned layout (pnpm monorepo)
 
