@@ -107,7 +107,21 @@ export function DashboardRoute() {
   const gradeLabel = `Grade ${student.grade}`;
 
   return (
-    <div className="min-h-screen w-full flex bg-bg font-body">
+    <>
+    {/* The dashboard is the desktop tree: the two-column layout has no mobile
+        collapse, so on small screens we say so instead of rendering it broken. */}
+    <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center md:hidden">
+      <h1 className="font-display text-[22px] font-extrabold text-ink">
+        The dashboard needs a bigger screen
+      </h1>
+      <p className="font-body text-[14px] font-semibold text-ink-3" style={{ marginTop: 8, maxWidth: 300 }}>
+        Open this page on a computer — or head back to the app, which is made for phones.
+      </p>
+      <div style={{ marginTop: 16 }}>
+        <Button kind="primary" size="md" onClick={() => navigate('/app')}>Back to the app</Button>
+      </div>
+    </div>
+    <div className="min-h-screen w-full hidden md:flex bg-bg font-body">
 
       {/* ── Left rail ───────────────────────────────────────────── */}
       <aside
@@ -528,5 +542,6 @@ export function DashboardRoute() {
 
       </main>
     </div>
+    </>
   );
 }
