@@ -7,6 +7,7 @@ import { children, guardians } from '../db/schema';
 import { guardianContext, type GuardianVariables } from '../lib/guardianContext';
 import { isLocked, recordFail, clearFails } from '../lib/pinLockout';
 import { getEntitlement, syncSeatQuantity } from '../lib/billing';
+import { deleteAccount, StripeCancelError } from '../lib/accountLifecycle';
 import type { MeResponse } from '@study-buddy/shared';
 
 export const meRoute = new Hono<{ Variables: GuardianVariables }>();
@@ -29,6 +30,20 @@ meRoute.get('/', async (c) => {
     entitlement,
   };
   return c.json(body);
+});
+
+meRoute.delete('/', async (c) => {
+  const g = c.get('guardian');
+  try {
+    await deleteAccount(g.id);
+  } catch (e) {
+    if (e instanceof StripeCancelError) {
+      console.error('[account-delete] stripe cancel failed', { guardianId: g.id }, e);
+      return c.json({ error: { code: 'stripe_cancel_failed', message: 'Could not cancel your subscription. Please try again.' } }, 502);
+    }
+    throw e; // unexpected → onError 500
+  }
+  return c.body(null, 204);
 });
 
 meRoute.post('/pin', async (c) => {

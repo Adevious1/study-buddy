@@ -5,7 +5,7 @@ import { makeGuardian } from '../../test/authHarness';
 import type { MeResponse } from '@study-buddy/shared';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { children, sessions, sessionSnapshots } from '../db/schema';
+import { children, guardians, sessions, sessionSnapshots } from '../db/schema';
 
 describe('GET /api/me', () => {
   beforeAll(async () => {
@@ -215,5 +215,16 @@ describe('DELETE /api/me/children/:childId', () => {
     });
     expect(res.status).toBe(404);
     expect((await db.select().from(children).where(eq(children.id, id))).length).toBe(1);
+  });
+});
+
+describe('DELETE /api/me', () => {
+  it('deletes the account and invalidates the session cookie', async () => {
+    const { cookie, guardianId } = await makeGuardian(`bye-${Date.now()}@test.dev`);
+    const res = await app.request('/api/me', { method: 'DELETE', headers: { Cookie: cookie } });
+    expect(res.status).toBe(204);
+    expect((await db.select().from(guardians).where(eq(guardians.id, guardianId))).length).toBe(0);
+    const after = await app.request('/api/me', { headers: { Cookie: cookie } });
+    expect(after.status).toBe(401);
   });
 });
