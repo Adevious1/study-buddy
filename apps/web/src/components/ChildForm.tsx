@@ -39,9 +39,14 @@ export function ChildForm({
     if (!valid || !gate || busy) return;
     setBusy(true);
     setError(null);
-    const err = await onSubmit({ name: name.trim(), birthDate, grade, pipColor });
-    setBusy(false);
-    if (err) setError(err);
+    try {
+      const err = await onSubmit({ name: name.trim(), birthDate, grade, pipColor });
+      if (err) setError(err);
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -95,7 +100,7 @@ export function ChildForm({
       {children}
       {error && <p className="font-body text-[13px] text-coral">{error}</p>}
       <Button kind="primary" size="lg" onClick={submit} disabled={!valid || !gate || busy}>
-        {submitLabel}
+        {busy ? 'Working…' : submitLabel}
       </Button>
     </div>
   );
