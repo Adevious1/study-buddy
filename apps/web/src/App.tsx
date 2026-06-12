@@ -7,6 +7,7 @@ import { ProfileRoute } from './routes/app/ProfileRoute';
 import { VoiceRoute } from './routes/app/VoiceRoute';
 import { RecapRoute } from './routes/app/RecapRoute';
 import { DashboardRoute } from './routes/dashboard/DashboardRoute';
+import { DashboardSettingsRoute } from './routes/dashboard/DashboardSettingsRoute';
 import { LoginRoute } from './routes/auth/LoginRoute';
 import { OnboardingRoute } from './routes/onboarding/OnboardingRoute';
 import { SwitchRoute } from './routes/onboarding/SwitchRoute';
@@ -69,6 +70,16 @@ export default function App() {
               <RequireGuardian>
                 <RequireDashboardPin>
                   <DashboardRoute />
+                </RequireDashboardPin>
+              </RequireGuardian>
+            }
+          />
+          <Route
+            path="/dashboard/settings"
+            element={
+              <RequireGuardian>
+                <RequireDashboardPin>
+                  <DashboardSettingsRoute />
                 </RequireDashboardPin>
               </RequireGuardian>
             }

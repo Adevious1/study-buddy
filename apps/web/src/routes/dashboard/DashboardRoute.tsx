@@ -131,6 +131,15 @@ export function DashboardRoute() {
           How I learn
         </Link>
 
+        <Link
+          to="/dashboard/settings"
+          className="flex items-center gap-3 rounded-[14px] font-bold text-[14px] text-ink-2 cursor-pointer no-underline hover:bg-bg-2 transition-colors"
+          style={{ padding: '12px 14px' }}
+        >
+          <div className="w-2 h-2 rounded-full bg-ink-4" />
+          Settings
+        </Link>
+
         {/* Spacer */}
         <div className="flex-1" />
 
