@@ -97,7 +97,7 @@ meRoute.post('/children', async (c) => {
   }).returning();
 
   await syncSeatQuantity(g.id);
-  return c.json({ id: child.id, name: child.name, grade: child.grade, pipColor: child.pipColor }, 201);
+  return c.json({ id: child.id, name: child.name, grade: child.grade, pipColor: child.pipColor, birthDate: child.birthDate }, 201);
 });
 
 const updateChildSchema = createChildSchema.omit({ consent: true }).partial();
@@ -119,12 +119,34 @@ meRoute.patch('/children/:childId', async (c) => {
   const child = await ownedChild(g.id, c.req.param('childId'));
   if (!child) return c.json({ error: { code: 'not_found', message: 'Child not found' } }, 404);
   const parsed = updateChildSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success || Object.keys(parsed.data).length === 0) {
+  if (!parsed.success) {
+    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields', issues: parsed.error.issues } }, 400);
+  }
+  if (Object.keys(parsed.data).length === 0) {
     return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields' } }, 400);
   }
-  const [updated] = await db.update(children).set(parsed.data).where(eq(children.id, child.id)).returning();
+  const [updated] = await db.update(children).set(parsed.data)
+    .where(and(eq(children.id, child.id), eq(children.guardianId, g.id)))
+    .returning();
+  if (!updated) return c.json({ error: { code: 'not_found', message: 'Child not found' } }, 404);
   return c.json({
     id: updated.id, name: updated.name, grade: updated.grade,
     pipColor: updated.pipColor, birthDate: updated.birthDate,
   });
+});
+
+meRoute.delete('/children/:childId', async (c) => {
+  const g = c.get('guardian');
+  const child = await ownedChild(g.id, c.req.param('childId'));
+  if (!child) return c.json({ error: { code: 'not_found', message: 'Child not found' } }, 404);
+  // Cascades wipe sessions, transcripts, snapshots, learning profile + traits, plans.
+  await db.delete(children).where(and(eq(children.id, child.id), eq(children.guardianId, g.id)));
+  // Seat decrement. Same partial-failure posture as add-child: if Stripe errors
+  // the child is still gone and the webhook reconciles (SP5 accepted limitation).
+  try {
+    await syncSeatQuantity(g.id);
+  } catch (e) {
+    console.error('[child-delete] seat sync failed (webhook will reconcile)', e);
+  }
+  return c.body(null, 204);
 });

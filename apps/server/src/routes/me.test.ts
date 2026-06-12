@@ -5,7 +5,7 @@ import { makeGuardian } from '../../test/authHarness';
 import type { MeResponse } from '@study-buddy/shared';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { children } from '../db/schema';
+import { children, sessions } from '../db/schema';
 
 describe('GET /api/me', () => {
   beforeAll(async () => {
@@ -153,5 +153,63 @@ describe('PATCH /api/me/children/:childId', () => {
     const me = await app.request('/api/me', { headers: { Cookie: cookie } });
     const body = await me.json() as MeResponse;
     expect(body.children[0].birthDate).toBe('2018-06-01');
+  });
+
+  it('404s on a malformed child id', async () => {
+    const { cookie } = await makeGuardian(`edit-m-${Date.now()}@test.dev`);
+    const res = await app.request('/api/me/children/not-a-uuid', {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'X' }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('400s on out-of-range fields (constraints carried from create)', async () => {
+    const { cookie } = await makeGuardian(`edit-r-${Date.now()}@test.dev`);
+    const id = await createChild(cookie);
+    const res = await app.request(`/api/me/children/${id}`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grade: 99 }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('DELETE /api/me/children/:childId', () => {
+  async function createChild(cookie: string): Promise<string> {
+    const res = await app.request('/api/me/children', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Del', birthDate: '2018-06-01', grade: 2, pipColor: 'sun', consent: true }),
+    });
+    const { id } = await res.json() as { id: string };
+    return id;
+  }
+
+  it('deletes the child and cascades sessions', async () => {
+    const { cookie } = await makeGuardian(`del-${Date.now()}@test.dev`);
+    const id = await createChild(cookie);
+    await db.insert(sessions).values({
+      childId: id, subjectKind: 'math', title: 'Shapes', state: 'completed',
+    });
+    const res = await app.request(`/api/me/children/${id}`, {
+      method: 'DELETE', headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(204);
+    expect((await db.select().from(children).where(eq(children.id, id))).length).toBe(0);
+    expect((await db.select().from(sessions).where(eq(sessions.childId, id))).length).toBe(0);
+  });
+
+  it("404s for another guardian's child (and deletes nothing)", async () => {
+    const a = await makeGuardian(`del-a-${Date.now()}@test.dev`);
+    const b = await makeGuardian(`del-b-${Date.now()}@test.dev`);
+    const id = await createChild(a.cookie);
+    const res = await app.request(`/api/me/children/${id}`, {
+      method: 'DELETE', headers: { Cookie: b.cookie },
+    });
+    expect(res.status).toBe(404);
+    expect((await db.select().from(children).where(eq(children.id, id))).length).toBe(1);
   });
 });
