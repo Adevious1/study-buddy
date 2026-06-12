@@ -76,6 +76,13 @@ describe('POST /api/me/children', () => {
       body: JSON.stringify({ name: 'Leo', birthDate: '2019-03-02', grade: 1, pipColor: 'mint' }),
     });
     expect(res.status).toBe(400);
+
+    const explicitFalse = await app.request('/api/me/children', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Leo', birthDate: '2019-03-02', grade: 1, pipColor: 'mint', consent: false }),
+    });
+    expect(explicitFalse.status).toBe(400);
   });
 
   it('stamps consent_at when consent is given', async () => {

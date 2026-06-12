@@ -93,12 +93,12 @@ export function AddChildForm({ onAdded }: { onAdded: (childId: string) => void }
         </div>
       </div>
       {error && <p className="font-body text-[13px] text-coral">{error}</p>}
-      <label className="flex items-start gap-2 font-body text-[12px] font-semibold text-ink-2">
+      <label className="flex cursor-pointer items-start gap-2 font-body text-[12px] font-semibold text-ink-2">
         <input
           type="checkbox"
           checked={consent}
           onChange={(e) => setConsent(e.target.checked)}
-          className="mt-[2px] h-5 w-5 accent-[var(--color-coral)]"
+          className="mt-[2px] h-5 w-5 accent-coral"
         />
         <span>
           I'm this child's parent or legal guardian and consent to Study Buddy processing their
