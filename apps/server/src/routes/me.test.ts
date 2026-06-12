@@ -280,6 +280,16 @@ describe('POST /api/me/pin/reset', () => {
     expect(verify.status).toBe(204);
   });
 
+  it('400s on a malformed newPin', async () => {
+    const { cookie } = await makeGuardian(`reset-bad-${Date.now()}@test.dev`);
+    const res = await app.request('/api/me/pin/reset', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: '4321' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
   it('403s with a stale session', async () => {
     const { cookie, guardianId } = await makeGuardian(`stale-${Date.now()}@test.dev`);
     const [g] = await db.select().from(guardians).where(eq(guardians.id, guardianId));

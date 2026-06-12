@@ -82,6 +82,8 @@ meRoute.put('/pin', async (c) => {
   return c.body(null, 204);
 });
 
+const resetPinSchema = z.object({ newPin: z.string().regex(/^\d{4}$/) });
+
 // A session is "fresh" if created within this window. The forgot-PIN flow signs
 // the guardian out and back in, so a legit reset always has a seconds-old
 // session. A kid holding the family browser's days-old session must not be able
@@ -96,11 +98,9 @@ meRoute.post('/pin/reset', async (c) => {
   if (age > PIN_RESET_MAX_SESSION_AGE_MS) {
     return c.json({ error: { code: 'stale_session', message: 'Please sign in again to reset your PIN' } }, 403);
   }
-  const parsed = pinSchema.safeParse(
-    await c.req.json().then((j) => ({ pin: (j as { newPin?: string })?.newPin })).catch(() => null),
-  );
+  const parsed = resetPinSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: { code: 'invalid_pin', message: 'PIN must be 4 digits' } }, 400);
-  const pinHash = await Bun.password.hash(parsed.data.pin);
+  const pinHash = await Bun.password.hash(parsed.data.newPin);
   await db.update(guardians).set({ pinHash }).where(eq(guardians.id, g.id));
   clearFails(g.id);
   return c.body(null, 204);
