@@ -73,3 +73,8 @@ export async function constructWebhookEvent(rawBody: string, signature: string):
   if (!secret) throw new Error('STRIPE_WEBHOOK_SECRET is required');
   return stripeClient().webhooks.constructEventAsync(rawBody, signature, secret);
 }
+
+/** Immediate cancellation — used by account deletion. No proration handling. */
+export async function cancelSubscription(subscriptionId: string): Promise<void> {
+  await stripeClient().subscriptions.cancel(subscriptionId);
+}
