@@ -28,6 +28,12 @@ const RECAP_MODEL_PLAN: readonly string[] = [
 const PER_ATTEMPT_TIMEOUT_MS = 15_000;
 /** Overall ceiling around a generation (backstop over the full plan). */
 const RECAP_TIMEOUT_MS = 45_000;
+/**
+ * Below this many turns (or with no child turn at all) there is nothing real to
+ * summarize — asking the model anyway invites confabulated achievements (observed
+ * live: a 13-second, 0-turn session got a recap claiming "solved 3 of 4").
+ */
+const MIN_TRANSCRIPT_TURNS = 4;
 
 export interface RecapGenInput {
   turns: TranscriptTurn[];
@@ -65,6 +71,11 @@ export async function generateRecap(
   generator: RecapGenerator | null,
   timeoutMs: number = RECAP_TIMEOUT_MS,
 ): Promise<RecapContent> {
+  const childSpoke = input.turns.some((t) => t.role === 'child');
+  if (input.turns.length < MIN_TRANSCRIPT_TURNS || !childSpoke) {
+    console.info(`[recap] transcript too thin (${input.turns.length} turns, childSpoke=${childSpoke}); using fallback`);
+    return fallbackRecap();
+  }
   if (!generator) return fallbackRecap();
   const startedAt = Date.now();
   try {

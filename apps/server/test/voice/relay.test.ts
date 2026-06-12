@@ -161,6 +161,8 @@ describe('voice relay', () => {
     ev.onOutputTranscript('If 12 apples', false);
     ev.onOutputTranscript(' are shared?', true);
     ev.onInputTranscript('six each', true);
+    ev.onOutputTranscript('How did you get six?', true);
+    ev.onInputTranscript('12 divided by 2', true);
 
     await relay.handleControl({ type: 'end' });
 
@@ -182,6 +184,8 @@ describe('voice relay', () => {
     expect(row.transcript).toEqual([
       { role: 'pip', text: 'If 12 apples are shared?' },
       { role: 'child', text: 'six each' },
+      { role: 'pip', text: 'How did you get six?' },
+      { role: 'child', text: '12 divided by 2' },
     ]);
   });
 
@@ -320,10 +324,12 @@ describe('voice relay', () => {
     const ev1 = await fake.events();
     ev1.onResumptionHandle('h');
     ev1.onOutputTranscript('Before reset', true);
+    ev1.onInputTranscript('Still here', true);
     ev1.onClose('reset');
     await tick();
 
     const ev2 = fake.latestEvents()!; // the post-reconnect session's events
+    ev2.onOutputTranscript('Welcome back', true);
     ev2.onInputTranscript('After reset', true);
 
     await relay.handleControl({ type: 'end' });

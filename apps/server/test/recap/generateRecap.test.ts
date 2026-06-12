@@ -8,6 +8,8 @@ import type { TranscriptTurn } from '@study-buddy/shared';
 
 const turns: TranscriptTurn[] = [
   { role: 'pip', text: 'What is 2 plus 3?' },
+  { role: 'child', text: 'Hmm, let me think.' },
+  { role: 'pip', text: 'Take your time!' },
   { role: 'child', text: 'Five!' },
 ];
 const input = { turns, childName: 'Maya', grade: 3, subjectKind: 'math' as const, topic: 'Adding' };
@@ -36,7 +38,9 @@ describe('generateRecap', () => {
     await generateRecap(input, gen);
     expect(seenInstruction).toContain('Maya');
     expect(seenInstruction).not.toMatch(/\{\{.*?\}\}/);
-    expect(seenScript).toBe('Pip: What is 2 plus 3?\nMaya: Five!');
+    expect(seenScript).toBe(
+      'Pip: What is 2 plus 3?\nMaya: Hmm, let me think.\nPip: Take your time!\nMaya: Five!',
+    );
   });
 
   it('falls back when the generator throws', async () => {
@@ -59,6 +63,40 @@ describe('generateRecap', () => {
 
   it('falls back when no generator is provided', async () => {
     const r = await generateRecap(input, null);
+    expect(r).toEqual(fallbackRecap());
+  });
+
+  it('falls back WITHOUT calling the model on an empty transcript', async () => {
+    let called = false;
+    const gen: RecapGenerator = async () => { called = true; return goodRaw; };
+    const r = await generateRecap({ ...input, turns: [] }, gen);
+    expect(called).toBe(false);
+    expect(r).toEqual(fallbackRecap());
+  });
+
+  it('falls back WITHOUT calling the model on a too-thin transcript', async () => {
+    let called = false;
+    const gen: RecapGenerator = async () => { called = true; return goodRaw; };
+    const thin: TranscriptTurn[] = [
+      { role: 'pip', text: 'Hi!' },
+      { role: 'child', text: 'Bye.' },
+    ];
+    const r = await generateRecap({ ...input, turns: thin }, gen);
+    expect(called).toBe(false);
+    expect(r).toEqual(fallbackRecap());
+  });
+
+  it('falls back WITHOUT calling the model when the child never spoke', async () => {
+    let called = false;
+    const gen: RecapGenerator = async () => { called = true; return goodRaw; };
+    const pipOnly: TranscriptTurn[] = [
+      { role: 'pip', text: 'Hello?' },
+      { role: 'pip', text: 'Are you there?' },
+      { role: 'pip', text: 'I will wait.' },
+      { role: 'pip', text: 'Goodbye!' },
+    ];
+    const r = await generateRecap({ ...input, turns: pipOnly }, gen);
+    expect(called).toBe(false);
     expect(r).toEqual(fallbackRecap());
   });
 });
