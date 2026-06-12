@@ -218,6 +218,45 @@ describe('DELETE /api/me/children/:childId', () => {
   });
 });
 
+describe('PIN change', () => {
+  async function setPin(cookie: string, pin: string) {
+    return app.request('/api/me/pin', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+  }
+
+  it('POST /pin refuses to overwrite an existing PIN (409)', async () => {
+    const { cookie } = await makeGuardian(`pinset-${Date.now()}@test.dev`);
+    expect((await setPin(cookie, '1111')).status).toBe(204);
+    expect((await setPin(cookie, '2222')).status).toBe(409);
+  });
+
+  it('PUT /pin changes the PIN when current is right; wrong current → 401', async () => {
+    const { cookie } = await makeGuardian(`pinchg-${Date.now()}@test.dev`);
+    await setPin(cookie, '1111');
+    const wrong = await app.request('/api/me/pin', {
+      method: 'PUT',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPin: '9999', newPin: '2222' }),
+    });
+    expect(wrong.status).toBe(401);
+    const right = await app.request('/api/me/pin', {
+      method: 'PUT',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPin: '1111', newPin: '2222' }),
+    });
+    expect(right.status).toBe(204);
+    const verify = await app.request('/api/me/pin/verify', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: '2222' }),
+    });
+    expect(verify.status).toBe(204);
+  });
+});
+
 describe('DELETE /api/me', () => {
   it('deletes the account and invalidates ALL sessions', async () => {
     const email = `bye-${Date.now()}@test.dev`;
