@@ -114,4 +114,6 @@ export interface CreateChildInput {
   birthDate: string; // YYYY-MM-DD
   grade: number;
   pipColor: PipColor;
+  /** Explicit parental consent to processing the child's data. Always true — the literal type forces the checkbox. */
+  consent: true;
 }

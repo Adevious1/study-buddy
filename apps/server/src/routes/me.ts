@@ -71,6 +71,7 @@ const createChildSchema = z.object({
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   grade: z.number().int().min(0).max(12),
   pipColor: z.enum(['coral', 'mint', 'lavender', 'sun', 'sky']),
+  consent: z.literal(true),
 });
 
 meRoute.post('/children', async (c) => {
@@ -92,6 +93,7 @@ meRoute.post('/children', async (c) => {
     grade: parsed.data.grade,
     pipColor: parsed.data.pipColor,
     startedWithPipOn: today,
+    consentAt: new Date(),
   }).returning();
 
   await syncSeatQuantity(g.id);

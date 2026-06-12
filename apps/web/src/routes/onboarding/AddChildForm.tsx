@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { CreateChildInput, PipColor } from '@study-buddy/shared';
 import { Button } from '../../components/ui/Button';
@@ -12,14 +13,15 @@ export function AddChildForm({ onAdded }: { onAdded: (childId: string) => void }
   const [birthDate, setBirthDate] = useState('');
   const [grade, setGrade] = useState(1);
   const [pipColor, setPipColor] = useState<PipColor>('coral');
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { setActiveChild } = useActiveChild();
   const qc = useQueryClient();
 
   const submit = async () => {
-    if (!name.trim() || !birthDate) return;
+    if (!name.trim() || !birthDate || !consent) return;
     setError(null);
-    const payload: CreateChildInput = { name: name.trim(), birthDate, grade, pipColor };
+    const payload: CreateChildInput = { name: name.trim(), birthDate, grade, pipColor, consent: true };
     let res: Response;
     try {
       res = await fetch(`${base}/me/children`, {
@@ -91,7 +93,20 @@ export function AddChildForm({ onAdded }: { onAdded: (childId: string) => void }
         </div>
       </div>
       {error && <p className="font-body text-[13px] text-coral">{error}</p>}
-      <Button kind="primary" size="lg" onClick={submit} disabled={!name.trim() || !birthDate}>
+      <label className="flex items-start gap-2 font-body text-[12px] font-semibold text-ink-2">
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          className="mt-[2px] h-5 w-5 accent-[var(--color-coral)]"
+        />
+        <span>
+          I'm this child's parent or legal guardian and consent to Study Buddy processing their
+          voice, photos, and learning data as described in the{' '}
+          <Link to="/privacy" className="underline" target="_blank">Privacy Policy</Link>.
+        </span>
+      </label>
+      <Button kind="primary" size="lg" onClick={submit} disabled={!name.trim() || !birthDate || !consent}>
         Add child
       </Button>
     </div>
