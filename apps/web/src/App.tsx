@@ -9,6 +9,7 @@ import { RecapRoute } from './routes/app/RecapRoute';
 import { DashboardRoute } from './routes/dashboard/DashboardRoute';
 import { DashboardSettingsRoute } from './routes/dashboard/DashboardSettingsRoute';
 import { LoginRoute } from './routes/auth/LoginRoute';
+import { GoodbyeRoute } from './routes/auth/GoodbyeRoute';
 import { OnboardingRoute } from './routes/onboarding/OnboardingRoute';
 import { SwitchRoute } from './routes/onboarding/SwitchRoute';
 import { RequireGuardian } from './routes/auth/RequireGuardian';
@@ -25,6 +26,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/app" replace />} />
           <Route path="/login" element={<LoginRoute />} />
+          <Route path="/goodbye" element={<GoodbyeRoute />} />
           <Route path="/privacy" element={<PrivacyRoute />} />
           <Route path="/terms" element={<TermsRoute />} />
           <Route

@@ -11,6 +11,7 @@ import { ErrorState } from '../../components/atoms/ErrorState';
 import { useActiveChild } from '../../state/ChildProfileContext';
 import { repositoryMe } from '../auth/me';
 import { openPortal, startCheckout } from '../billing/billingClient';
+import { signOut } from '../../auth/authClient';
 
 const base = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
 
@@ -19,6 +20,7 @@ export function DashboardSettingsRoute() {
   const { activeChildId, setActiveChild } = useActiveChild();
   const meQ = useQuery({ queryKey: ['me'], queryFn: repositoryMe });
   const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   if (meQ.isError) return <ErrorState onRetry={() => meQ.refetch()} />;
   if (meQ.isPending || !meQ.data) return <div className="min-h-screen bg-bg" />;
@@ -108,6 +110,20 @@ export function DashboardSettingsRoute() {
           )}
         </Card>
 
+        {/* ── Danger zone ── */}
+        <SectionTitle>Delete account</SectionTitle>
+        <Card className="border-[1.5px] border-coral" style={{ borderRadius: 22, padding: 20, marginTop: 10, marginBottom: 28 }}>
+          <p className="font-body text-[14px] text-ink-2">
+            Permanently deletes your account, every child profile, and all sessions, transcripts,
+            and photos. Your subscription is cancelled immediately. This cannot be undone.
+          </p>
+          <div style={{ marginTop: 12 }}>
+            <Button kind="dark" size="md" onClick={() => setDeletingAccount(true)}>
+              Delete my account…
+            </Button>
+          </div>
+        </Card>
+
         {/* ── Legal ── */}
         <p className="font-body text-[12px] text-ink-3" style={{ marginTop: 8 }}>
           <Link to="/terms" className="underline" target="_blank">Terms</Link>
@@ -124,6 +140,28 @@ export function DashboardSettingsRoute() {
           actionLabel="Delete forever"
           onConfirm={deleteChild}
           onClose={() => setDeleting(null)}
+        />
+      )}
+
+      {deletingAccount && (
+        <ConfirmDangerModal
+          title="Delete your whole account?"
+          body="This erases your guardian account, every child profile, and all of their data, and cancels your subscription immediately. It cannot be undone."
+          confirmWord="DELETE"
+          actionLabel="Delete everything"
+          onConfirm={async () => {
+            const res = await fetch(`${base}/me`, { method: 'DELETE', credentials: 'include' }).catch(() => null);
+            if (!res || res.status !== 204) {
+              return res?.status === 502
+                ? "We couldn't cancel your subscription — nothing was deleted. Please try again."
+                : 'Could not delete the account. Please try again.';
+            }
+            setActiveChild(null);
+            await signOut().catch(() => {}); // server session is already gone; clear client state
+            window.location.assign('/goodbye');
+            return null;
+          }}
+          onClose={() => setDeletingAccount(false)}
         />
       )}
     </div>
