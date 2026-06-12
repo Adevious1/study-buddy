@@ -1,5 +1,22 @@
 # SP7 — Camera Vision ("Show Pip") manual smoke
 
+> **✅ RUN 2026-06-12 (iPhone Chrome via cloudflared tunnel + human mic):** all
+> items verified.
+> - Happy path, Retake, **printed-answer Socratic-on-vision** (Pip guided, did
+>   not read the visible answer), and the **offer_camera pulse** confirmed by
+>   the human runner across two sessions (one 2.8-min Writing, one 14.1-min
+>   Math); snapshots persisted (psql-verified, 81–103 KB JPEGs tied to their
+>   session rows).
+> - **Permission-denied:** camera blocked → friendly message, Pip's audio
+>   continued uninterrupted.
+> - **Dashboard viewer:** "What Maya showed Pip" rendered all four snapshots
+>   (incl. both from this run); full-image serve returned `image/jpeg` with
+>   `nosniff` + CSP-sandbox intact.
+> - **Authz:** a throwaway second guardian got **404** on both the snapshot
+>   list and a direct snapshot URL for Maya's child id; no session → 401.
+> - Side observation: `/dashboard` has **no mobile layout** (desktop tree by
+>   design) — unusable on a phone screen; logged in the audit doc as follow-up.
+
 Camera capture needs a real device + a human mic session; this is not in CI.
 Run on Chrome (the verified browser). Dev seed login: `parent@studybuddy.dev` /
 `studybuddy`, dashboard PIN `1234`.

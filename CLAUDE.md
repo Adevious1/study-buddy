@@ -10,14 +10,13 @@ The design spec lives in `docs/superpowers/specs/`.
 
 ## Status
 
-**SP1 (UI), SP2 (backend + database), SP3 (live voice tutor), SP4 (auth),
-SP5 (billing), and SP6 (session recap) are all done. SP7 (camera vision /
-"Show Pip") is implemented, pending its human mic smoke
-(`SP7-manual-smoke.md`). SP8 (reconnect / longer sessions) is implemented,
-pending its human mic smoke (`SP8-manual-smoke.md`). SP9 (account lifecycle
-& compliance) is done — browser smoke verified 2026-06-12
-(`SP9-manual-smoke.md`; only the live-Stripe cancel check is tabled). All
-nine subsystems are merged to `main`; the feature branches are deleted.**
+**All nine subsystems — SP1 (UI), SP2 (backend + database), SP3 (live voice
+tutor), SP4 (auth), SP5 (billing), SP6 (session recap), SP7 (camera vision /
+"Show Pip"), SP8 (reconnect / longer sessions), and SP9 (account lifecycle &
+compliance) — are done and smoke-verified** (SP7 + SP8 via a human mic run and
+SP9 via a browser run, all on 2026-06-12; the only tabled checks are SP5/SP9's
+live-Stripe click-throughs and SP8's auto-cap firing, each unit-covered). All
+nine are merged to `main`; the feature branches are deleted.
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
@@ -54,8 +53,9 @@ still deferred. Key files: `apps/server/src/voice/relay.ts`
 (`connectGemini`/`reconnect`/`onClose`, nudge scheduling),
 `apps/server/src/voice/geminiSession.ts` (resumption handle), the
 director-cue rule in `study-buddy.md`, and `test/voice/relay.test.ts` +
-`test/voice/systemPrompt.test.ts`. Pending human mic smoke
-(`SP8-manual-smoke.md`).
+`test/voice/systemPrompt.test.ts`. Mic smoke ✅ verified 2026-06-12
+(`SP8-manual-smoke.md`; auto-cap firing and reconnect-failure fallback
+unit-covered, not observed live).
 
 SP9 (account lifecycle & compliance): guardian settings page at
 `/dashboard/settings` behind the PIN gate — edit child (name / grade / birthdate / Pip
@@ -170,13 +170,17 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
   `gemini-3.5-flash` summary → populated `/app/recap`), real session-specific
   recap generated. Required the recap model fix (`gemini-3.5-flash`) and a 30s
   generation timeout; the graceful fallback path is also confirmed.
-- `SP7-manual-smoke.md` (camera vision) — ❌ **pending**: needs a real device +
-  human mic session (happy-path snapshot → Pip reacts, Socratic-on-vision,
-  `offer_camera` pulse, retake/permission-denied, dashboard snapshot panel).
-- `SP8-manual-smoke.md` (reconnect / longer sessions) — ❌ **pending**: needs a
-  real device + human mic session crossing the ~10-min Gemini connection reset
-  (brief `'resuming'` flash, seamless audio continuation, director-cue nudge,
-  fallback-to-recap on retry exhaustion).
+- `SP7-manual-smoke.md` (camera vision) — ✅ **verified** via a human mic run
+  (2026-06-12, phone via tunnel): happy path + retake, printed-answer
+  Socratic-on-vision, `offer_camera` pulse, permission-denied (audio
+  unaffected), dashboard viewer + image-serve headers, and authz 404s for a
+  non-owner guardian.
+- `SP8-manual-smoke.md` (reconnect / longer sessions) — ✅ **verified** via a
+  human mic run (2026-06-12): one continuous 14.1-min / 114-turn session
+  crossed the ~10-min Gemini reset (brief "one sec…" → live, context kept),
+  ~13-min wrap-up nudge fired without leaking the director cue, manual End →
+  full recap. The 15-min auto-cap firing and the reconnect-failure fallback
+  were not observed live (unit-covered).
 - `SP9-manual-smoke.md` (account lifecycle & compliance) — ✅ **verified** via a
   Playwright run (2026-06-12) on a throwaway guardian: consent gating + `consent_at`
   stamp, settings (edit/delete child incl. last-child → onboarding PIN-skip), PIN
@@ -248,16 +252,16 @@ implementation cycle. **Do not collapse these into one effort.**
    forwarded into the same Gemini Live session (`sendRealtimeInput({ video })`),
    persisted as `session_snapshots` (Postgres `bytea`); preview+confirm capture;
    `offer_camera` tool lets Pip invite the camera; Socratic-on-vision prompt rule;
-   guardian dashboard viewer behind `childContext` authz. Pending human mic smoke
-   (`SP7-manual-smoke.md`).
+   guardian dashboard viewer behind `childContext` authz. Mic smoke ✅ verified
+   2026-06-12 (`SP7-manual-smoke.md`).
 8. **Reconnect / longer sessions** ✓ _implemented_ — transparent relay↔Gemini
    reconnect via the Gemini session-resumption handle across Gemini's ~10-min
    connection reset (browser↔relay WS stays open; browser sees a brief
    `'resuming'` then `'live'`); session soft-cap raised to 15 min; a ~13-min
    in-band director-cue nudge (tunable via `study-buddy.md`) prompts Pip to
    wrap up; bounded retries fall back to a graceful completed recap. The
-   browser↔relay (child-network) reconnect remains deferred. Pending human mic
-   smoke (`SP8-manual-smoke.md`).
+   browser↔relay (child-network) reconnect remains deferred. Mic smoke ✅
+   verified 2026-06-12 (`SP8-manual-smoke.md`).
 9. **Account lifecycle & compliance** ✓ _implemented_ — guardian settings page
    (`/dashboard/settings`) behind the PIN gate: edit child (name / grade / birthdate / Pip color),
    delete child (typed-name confirm + cascade wipe + Stripe seat decrement),
