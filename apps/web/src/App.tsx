@@ -16,6 +16,7 @@ import { RequireDashboardPin } from './routes/auth/RequireDashboardPin';
 import { SubscribeRoute } from './routes/billing/SubscribeRoute';
 import { PrivacyRoute } from './routes/legal/PrivacyRoute';
 import { TermsRoute } from './routes/legal/TermsRoute';
+import { PinResetRoute } from './routes/auth/PinResetRoute';
 
 export default function App() {
   return (
@@ -81,6 +82,14 @@ export default function App() {
                 <RequireDashboardPin>
                   <DashboardSettingsRoute />
                 </RequireDashboardPin>
+              </RequireGuardian>
+            }
+          />
+          <Route
+            path="/pin-reset"
+            element={
+              <RequireGuardian>
+                <PinResetRoute />
               </RequireGuardian>
             }
           />

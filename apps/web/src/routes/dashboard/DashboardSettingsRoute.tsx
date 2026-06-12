@@ -89,6 +89,12 @@ export function DashboardSettingsRoute() {
           ))}
         </div>
 
+        {/* ── Security ── */}
+        <SectionTitle>Security</SectionTitle>
+        <Card style={{ borderRadius: 22, padding: 20, marginTop: 10, marginBottom: 28 }}>
+          <ChangePinForm />
+        </Card>
+
         {/* ── Subscription ── */}
         <SectionTitle>Subscription</SectionTitle>
         <Card style={{ borderRadius: 22, padding: 20, marginTop: 10, marginBottom: 28 }}>
@@ -120,6 +126,61 @@ export function DashboardSettingsRoute() {
           onClose={() => setDeleting(null)}
         />
       )}
+    </div>
+  );
+}
+
+function ChangePinForm() {
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const submit = async () => {
+    setMsg(null);
+    const res = await fetch(`${base}/me/pin`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPin, newPin }),
+    }).catch(() => null);
+    if (res?.status === 204) {
+      setMsg({ ok: true, text: 'PIN updated.' });
+      setCurrentPin(''); setNewPin('');
+    } else if (res?.status === 401) {
+      setMsg({ ok: false, text: 'Current PIN is wrong.' });
+    } else if (res?.status === 429) {
+      setMsg({ ok: false, text: 'Too many attempts — try again in a minute.' });
+    } else {
+      setMsg({ ok: false, text: 'Could not update the PIN. Please try again.' });
+    }
+  };
+
+  const pinInput = (value: string, set: (v: string) => void, label: string) => (
+    <label className="flex flex-col gap-1 font-body text-[13px] font-bold text-ink-3">
+      {label}
+      <input
+        inputMode="numeric"
+        maxLength={4}
+        value={value}
+        onChange={(e) => set(e.target.value.replace(/\D/g, ''))}
+        className="w-32 rounded-2xl border-[1.5px] border-line px-3 py-2 text-center font-mono text-[20px] tracking-[6px] text-ink"
+      />
+    </label>
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="font-display text-[16px] font-bold text-ink">Dashboard PIN</div>
+      <div className="flex flex-wrap gap-4">
+        {pinInput(currentPin, setCurrentPin, 'Current PIN')}
+        {pinInput(newPin, setNewPin, 'New PIN')}
+      </div>
+      {msg && <p className={`font-body text-[13px] ${msg.ok ? 'text-mint' : 'text-coral'}`}>{msg.text}</p>}
+      <div>
+        <Button kind="soft" size="md" onClick={submit} disabled={currentPin.length !== 4 || newPin.length !== 4}>
+          Change PIN
+        </Button>
+      </div>
     </div>
   );
 }
