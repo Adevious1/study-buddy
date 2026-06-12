@@ -22,19 +22,21 @@ export interface ButtonProps {
   kind?: Kind;
   size?: Size;
   full?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
   style?: CSSProperties;
   className?: string;
 }
 
 export function Button({
-  children, kind = 'primary', size = 'md', full = false, onClick, style, className = '',
+  children, kind = 'primary', size = 'md', full = false, disabled = false, onClick, style, className = '',
 }: ButtonProps) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={style}
-      className={`cursor-pointer rounded-full border-0 font-body font-extrabold transition-transform active:translate-y-0.5 ${SIZE[size]} ${KIND[kind]} ${full ? 'w-full' : ''} ${className}`}
+      className={`cursor-pointer rounded-full border-0 font-body font-extrabold transition-transform active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0 ${SIZE[size]} ${KIND[kind]} ${full ? 'w-full' : ''} ${className}`}
     >
       {children}
     </button>

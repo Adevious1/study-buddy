@@ -34,6 +34,9 @@ const RECONNECT_BACKOFFS_MS = [500, 1500]; // delays between reconnect attempts 
 const WRAP_UP_CUE =
   '[director cue: about two minutes left — start guiding toward a natural stopping point and a quick recap of what you two figured out.]';
 const MAX_SNAPSHOT_BYTES = 2_000_000; // ~2MB decoded; a 1024px q0.85 JPEG is far smaller
+// 4 base64 chars per 3 decoded bytes — lets oversized payloads be rejected
+// from the string length alone, before paying for the decode.
+const MAX_SNAPSHOT_B64_CHARS = Math.ceil(MAX_SNAPSHOT_BYTES / 3) * 4;
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -229,7 +232,10 @@ export function createRelay(opts: RelayOptions) {
 
   async function handleSnapshot(mime: string, data: string) {
     if (state !== 'live' || !session || !sessionRowId) return;
-    if (mime !== 'image/jpeg') { sink.sendControl({ type: 'snapshot-ack', ok: false }); return; }
+    if (mime !== 'image/jpeg' || data.length === 0 || data.length > MAX_SNAPSHOT_B64_CHARS) {
+      sink.sendControl({ type: 'snapshot-ack', ok: false });
+      return;
+    }
     const bytes = Buffer.from(data, 'base64');
     if (bytes.length === 0 || bytes.length > MAX_SNAPSHOT_BYTES) {
       sink.sendControl({ type: 'snapshot-ack', ok: false });

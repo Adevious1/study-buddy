@@ -81,7 +81,7 @@ export function AddChildForm({ onAdded }: { onAdded: (childId: string) => void }
               type="button"
               onClick={() => setPipColor(c)}
               aria-label={c}
-              className="h-9 w-9 rounded-full border-2"
+              className="h-11 w-11 rounded-full border-2"
               style={{
                 background: `var(--color-${c})`,
                 borderColor: pipColor === c ? 'var(--color-ink)' : 'transparent',
@@ -91,12 +91,7 @@ export function AddChildForm({ onAdded }: { onAdded: (childId: string) => void }
         </div>
       </div>
       {error && <p className="font-body text-[13px] text-coral">{error}</p>}
-      <Button
-        kind="primary"
-        size="lg"
-        onClick={submit}
-        style={!name.trim() || !birthDate ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-      >
+      <Button kind="primary" size="lg" onClick={submit} disabled={!name.trim() || !birthDate}>
         Add child
       </Button>
     </div>

@@ -8,7 +8,7 @@ import { SectionTitle } from '../../components/ui/SectionTitle';
 import { Flame, Star } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
 import { repository } from '../../data';
-import { formatProgressLabel } from '../../format';
+import { formatProgressLabel, formatTodayLabel } from '../../format';
 import { usePipColor } from '../../state/PipColorContext';
 import { useActiveChildId } from '../../state/ChildProfileContext';
 
@@ -58,7 +58,7 @@ export function HomeRoute() {
       {/* Greeting block */}
       <div style={{ padding: '14px 20px 16px' }}>
         <div className="font-body text-[13px] font-bold uppercase tracking-[0.4px] text-ink-3">
-          Tuesday · April 22
+          {formatTodayLabel()}
         </div>
         <div
           className="font-display font-extrabold text-ink"

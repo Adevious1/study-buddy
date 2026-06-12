@@ -65,12 +65,7 @@ export function DashboardPinGate({ onUnlocked }: { onUnlocked: () => void }) {
         </p>
       )}
       <div style={{ marginTop: 16 }}>
-        <Button
-          kind="primary"
-          size="lg"
-          onClick={verify}
-          style={pin.length !== 4 ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-        >
+        <Button kind="primary" size="lg" onClick={verify} disabled={pin.length !== 4}>
           Unlock
         </Button>
       </div>

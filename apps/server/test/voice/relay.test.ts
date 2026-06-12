@@ -215,6 +215,20 @@ describe('voice relay', () => {
     expect(out.control).toContainEqual({ type: 'snapshot-ack', ok: false });
   });
 
+  it('rejects an oversized snapshot without forwarding it', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Shapes', title: 'Shapes' });
+
+    // base64 for >2MB of decoded bytes — must be rejected by length alone
+    const huge = 'A'.repeat(2_800_000);
+    await relay.handleControl({ type: 'snapshot', mime: 'image/jpeg', data: huge });
+
+    expect(fake.sent.images).toHaveLength(0);
+    expect(out.control).toContainEqual({ type: 'snapshot-ack', ok: false });
+  });
+
   it('emits camera-offered and acks the tool when Pip calls offer_camera', async () => {
     const fake = makeFakeGemini();
     const out = sink();

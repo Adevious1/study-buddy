@@ -215,7 +215,7 @@ export function VoiceRoute() {
     >
       <div className="flex items-center gap-3 px-[18px] py-3">
         <button
-          className="w-9 h-9 rounded-full flex items-center justify-center border-[1.5px] border-line cursor-pointer"
+          className="w-11 h-11 rounded-full flex items-center justify-center border-[1.5px] border-line cursor-pointer"
           style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)' }}
           onClick={() => { end(); }}
           aria-label="Back"
