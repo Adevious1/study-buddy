@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pip } from '../../components/Pip';
 import { Button } from '../../components/ui/Button';
+import { signOut } from '../../auth/authClient';
 
 const base = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
 
@@ -22,7 +23,9 @@ export function PinResetRoute() {
       sessionStorage.removeItem('pinReset');
       navigate('/dashboard', { replace: true });
     } else if (res?.status === 403) {
-      setError('Your sign-in is too old — please sign out and back in, then try again.');
+      sessionStorage.setItem('pinReset', '1');
+      await signOut();
+      window.location.assign('/login');
     } else {
       setError('Could not set the PIN. Please try again.');
     }
@@ -42,6 +45,7 @@ export function PinResetRoute() {
         maxLength={4}
         value={pin}
         onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+        onKeyDown={(e) => { if (e.key === 'Enter' && pin.length === 4) void submit(); }}
         className="w-40 rounded-2xl border-[1.5px] border-line px-3 py-2 text-center font-mono text-[24px] tracking-[8px] text-ink"
       />
       {error && <p className="font-body text-[13px] text-coral" style={{ marginTop: 12 }}>{error}</p>}

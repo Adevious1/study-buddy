@@ -134,24 +134,32 @@ function ChangePinForm() {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const submit = async () => {
+    if (busy) return;
+    if (currentPin.length !== 4 || newPin.length !== 4) return;
+    setBusy(true);
     setMsg(null);
-    const res = await fetch(`${base}/me/pin`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ currentPin, newPin }),
-    }).catch(() => null);
-    if (res?.status === 204) {
-      setMsg({ ok: true, text: 'PIN updated.' });
-      setCurrentPin(''); setNewPin('');
-    } else if (res?.status === 401) {
-      setMsg({ ok: false, text: 'Current PIN is wrong.' });
-    } else if (res?.status === 429) {
-      setMsg({ ok: false, text: 'Too many attempts — try again in a minute.' });
-    } else {
-      setMsg({ ok: false, text: 'Could not update the PIN. Please try again.' });
+    try {
+      const res = await fetch(`${base}/me/pin`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPin, newPin }),
+      }).catch(() => null);
+      if (res?.status === 204) {
+        setMsg({ ok: true, text: 'PIN updated.' });
+        setCurrentPin(''); setNewPin('');
+      } else if (res?.status === 401) {
+        setMsg({ ok: false, text: 'Current PIN is wrong.' });
+      } else if (res?.status === 429) {
+        setMsg({ ok: false, text: 'Too many attempts — try again in a minute.' });
+      } else {
+        setMsg({ ok: false, text: 'Could not update the PIN. Please try again.' });
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -163,6 +171,7 @@ function ChangePinForm() {
         maxLength={4}
         value={value}
         onChange={(e) => set(e.target.value.replace(/\D/g, ''))}
+        onKeyDown={(e) => { if (e.key === 'Enter') void submit(); }}
         className="w-32 rounded-2xl border-[1.5px] border-line px-3 py-2 text-center font-mono text-[20px] tracking-[6px] text-ink"
       />
     </label>
@@ -177,8 +186,8 @@ function ChangePinForm() {
       </div>
       {msg && <p className={`font-body text-[13px] ${msg.ok ? 'text-mint' : 'text-coral'}`}>{msg.text}</p>}
       <div>
-        <Button kind="soft" size="md" onClick={submit} disabled={currentPin.length !== 4 || newPin.length !== 4}>
-          Change PIN
+        <Button kind="soft" size="md" onClick={() => void submit()} disabled={currentPin.length !== 4 || newPin.length !== 4 || busy}>
+          {busy ? 'Working…' : 'Change PIN'}
         </Button>
       </div>
     </div>
