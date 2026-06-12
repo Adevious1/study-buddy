@@ -101,6 +101,10 @@ export const children = pgTable(
     streakDays: integer('streak_days').notNull().default(0),
     starsToday: integer('stars_today').notNull().default(0),
     starsTodayMax: integer('stars_today_max').notNull().default(4),
+    // Parental consent to processing this child's data (voice, photos,
+    // learning records). Stamped at creation by SP9's consent checkbox.
+    // Nullable: children created before SP9 have no recorded consent.
+    consentAt: timestamp('consent_at', { withTimezone: true }),
     ...timestamps,
   },
   (t) => ({
