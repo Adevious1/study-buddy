@@ -5,7 +5,7 @@ import { makeGuardian } from '../../test/authHarness';
 import type { MeResponse } from '@study-buddy/shared';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { children, sessions } from '../db/schema';
+import { children, sessions, sessionSnapshots } from '../db/schema';
 
 describe('GET /api/me', () => {
   beforeAll(async () => {
@@ -191,8 +191,11 @@ describe('DELETE /api/me/children/:childId', () => {
   it('deletes the child and cascades sessions', async () => {
     const { cookie } = await makeGuardian(`del-${Date.now()}@test.dev`);
     const id = await createChild(cookie);
-    await db.insert(sessions).values({
+    const [sess] = await db.insert(sessions).values({
       childId: id, subjectKind: 'math', title: 'Shapes', state: 'completed',
+    }).returning();
+    await db.insert(sessionSnapshots).values({
+      sessionId: sess.id, childId: id, image: Buffer.from([1]), mime: 'image/jpeg',
     });
     const res = await app.request(`/api/me/children/${id}`, {
       method: 'DELETE', headers: { Cookie: cookie },
@@ -200,6 +203,7 @@ describe('DELETE /api/me/children/:childId', () => {
     expect(res.status).toBe(204);
     expect((await db.select().from(children).where(eq(children.id, id))).length).toBe(0);
     expect((await db.select().from(sessions).where(eq(sessions.childId, id))).length).toBe(0);
+    expect((await db.select().from(sessionSnapshots).where(eq(sessionSnapshots.childId, id))).length).toBe(0);
   });
 
   it("404s for another guardian's child (and deletes nothing)", async () => {

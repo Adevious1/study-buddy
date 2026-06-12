@@ -141,12 +141,12 @@ meRoute.delete('/children/:childId', async (c) => {
   if (!child) return c.json({ error: { code: 'not_found', message: 'Child not found' } }, 404);
   // Cascades wipe sessions, transcripts, snapshots, learning profile + traits, plans.
   await db.delete(children).where(and(eq(children.id, child.id), eq(children.guardianId, g.id)));
-  // Seat decrement. Same partial-failure posture as add-child: if Stripe errors
-  // the child is still gone and the webhook reconciles (SP5 accepted limitation).
+  // Seat decrement, best-effort: if Stripe errors the child is still gone and
+  // the quantity corrects on the next seat sync (add/delete). SP5 accepted limitation.
   try {
     await syncSeatQuantity(g.id);
   } catch (e) {
-    console.error('[child-delete] seat sync failed (webhook will reconcile)', e);
+    console.error('[child-delete] seat sync failed; quantity corrects on next seat sync', { guardianId: g.id, childId: child.id }, e);
   }
   return c.body(null, 204);
 });
