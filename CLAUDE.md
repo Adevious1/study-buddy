@@ -159,6 +159,11 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
+A whole-app gap audit (2026-06-11) lives in
+`docs/superpowers/audit-2026-06-11.md` — the prioritized list of remaining
+holes (account/data deletion, compliance pages, observability, Stripe webhook
+dedup, prod docker, etc.). Consult it before planning new work.
+
 **Deferred to a later effort:** LLM-written profile notes, interactive hint chips,
 true subjectless free-talk, and the browser↔relay (child-network) reconnect —
 surviving the child's own WebSocket dropping (relay session persistence +

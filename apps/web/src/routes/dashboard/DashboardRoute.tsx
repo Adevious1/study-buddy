@@ -9,7 +9,7 @@ import { Flame, Sparkle, SubjectIcon } from '../../components/ui/icons';
 import { ErrorState } from '../../components/atoms/ErrorState';
 import { repository } from '../../data';
 import { snapshotImageUrl } from '../../data/apiRepository';
-import { formatDuration, formatDelta, formatProgressLabel } from '../../format';
+import { formatDuration, formatDelta, formatProgressLabel, formatTodayLabel } from '../../format';
 import { subjectLabel, subjectTheme } from '../../theme/subjectTheme';
 import { usePipColor } from '../../state/PipColorContext';
 import { useActiveChildId } from '../../state/ChildProfileContext';
@@ -43,6 +43,12 @@ export function DashboardRoute() {
   const snapshotsQ = useQuery({
     queryKey: ['child', childId, 'snapshots'],
     queryFn: () => repository.getRecentSnapshots(),
+  });
+  // Nullable like on /app/profile: a brand-new child has no learning profile
+  // until their first session writes one (404 → null). Never gates the page.
+  const learningProfileQ = useQuery({
+    queryKey: ['child', childId, 'learningProfile'],
+    queryFn: () => repository.getLearningProfile(),
   });
   const meQ = useQuery({ queryKey: ['me'], queryFn: repositoryMe });
   const ent = meQ.data?.entitlement;
@@ -184,7 +190,7 @@ export function DashboardRoute() {
         <div className="flex items-end justify-between" style={{ marginBottom: 18 }}>
           <div>
             <div className="font-bold text-[12px] text-ink-3 uppercase tracking-[0.6px]">
-              Tuesday · April 22
+              {formatTodayLabel()}
             </div>
             <div
               className="font-display font-extrabold text-ink"
@@ -360,7 +366,8 @@ export function DashboardRoute() {
                 className="font-display font-bold text-ink"
                 style={{ fontSize: 16, marginTop: 6, lineHeight: 1.25 }}
               >
-                You learn best when we draw it out first.
+                {learningProfileQ.data?.note ??
+                  `Pip is still getting to know ${student.name} — insights show up after a few sessions.`}
               </div>
             </Card>
           </div>

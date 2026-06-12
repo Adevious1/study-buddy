@@ -67,7 +67,7 @@ export function OnboardingRoute() {
             </p>
           )}
           <div style={{ marginTop: 16 }}>
-            <Button kind="primary" size="lg" onClick={savePin}>
+            <Button kind="primary" size="lg" onClick={savePin} disabled={pin.length !== 4}>
               Continue
             </Button>
           </div>

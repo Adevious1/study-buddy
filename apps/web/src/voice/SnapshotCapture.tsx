@@ -60,7 +60,7 @@ export function SnapshotCapture({ onCapture, onClose }: Props) {
         <button
           type="button"
           aria-label="Close camera"
-          className="w-9 h-9 rounded-full bg-white/15 text-white flex items-center justify-center cursor-pointer border-0"
+          className="w-11 h-11 rounded-full bg-white/15 text-white flex items-center justify-center cursor-pointer border-0"
           onClick={onClose}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">

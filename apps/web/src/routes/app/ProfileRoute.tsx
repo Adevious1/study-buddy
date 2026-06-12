@@ -194,21 +194,27 @@ export function ProfileRoute() {
                     aria-label={key}
                     aria-pressed={selected}
                     onClick={() => setPipColor(key)}
-                    className="bg-transparent border-0 p-0 cursor-pointer"
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: 99,
-                      background: PIP_COLOR_VALUE[key],
-                      border: selected
-                        ? '2.5px solid var(--color-ink)'
-                        : '2.5px solid transparent',
-                      boxShadow: selected
-                        ? '0 0 0 2px var(--color-bg)'
-                        : 'none',
-                      flexShrink: 0,
-                    }}
-                  />
+                    className="bg-transparent border-0 p-0 cursor-pointer flex items-center justify-center"
+                    // 44px hit area for small fingers; -9px margins keep the
+                    // visible 26px swatch exactly where the old layout had it.
+                    style={{ width: 44, height: 44, margin: -9, flexShrink: 0 }}
+                  >
+                    <span
+                      style={{
+                        display: 'block',
+                        width: 26,
+                        height: 26,
+                        borderRadius: 99,
+                        background: PIP_COLOR_VALUE[key],
+                        border: selected
+                          ? '2.5px solid var(--color-ink)'
+                          : '2.5px solid transparent',
+                        boxShadow: selected
+                          ? '0 0 0 2px var(--color-bg)'
+                          : 'none',
+                      }}
+                    />
+                  </button>
                 );
               })}
             </div>
