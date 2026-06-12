@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { setSignedCookie, getSignedCookie } from 'hono/cookie';
 import { db } from '../db/client';
@@ -18,7 +18,7 @@ const pinSchema = z.object({ pin: z.string().regex(/^\d{4}$/) });
 meRoute.get('/', async (c) => {
   const g = c.get('guardian');
   const rows = await db
-    .select({ id: children.id, name: children.name, grade: children.grade, pipColor: children.pipColor })
+    .select({ id: children.id, name: children.name, grade: children.grade, pipColor: children.pipColor, birthDate: children.birthDate })
     .from(children)
     .where(eq(children.guardianId, g.id));
   const entitlement = await getEntitlement(g.id);
@@ -98,4 +98,33 @@ meRoute.post('/children', async (c) => {
 
   await syncSeatQuantity(g.id);
   return c.json({ id: child.id, name: child.name, grade: child.grade, pipColor: child.pipColor }, 201);
+});
+
+const updateChildSchema = createChildSchema.omit({ consent: true }).partial();
+const uuidSchema = z.string().uuid();
+
+/** Ownership lookup shared by PATCH/DELETE: unknown or unowned → null (caller 404s). */
+async function ownedChild(guardianId: string, childId: string) {
+  if (!uuidSchema.safeParse(childId).success) return null;
+  const [child] = await db
+    .select()
+    .from(children)
+    .where(and(eq(children.id, childId), eq(children.guardianId, guardianId)))
+    .limit(1);
+  return child ?? null;
+}
+
+meRoute.patch('/children/:childId', async (c) => {
+  const g = c.get('guardian');
+  const child = await ownedChild(g.id, c.req.param('childId'));
+  if (!child) return c.json({ error: { code: 'not_found', message: 'Child not found' } }, 404);
+  const parsed = updateChildSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success || Object.keys(parsed.data).length === 0) {
+    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields' } }, 400);
+  }
+  const [updated] = await db.update(children).set(parsed.data).where(eq(children.id, child.id)).returning();
+  return c.json({
+    id: updated.id, name: updated.name, grade: updated.grade,
+    pipColor: updated.pipColor, birthDate: updated.birthDate,
+  });
 });

@@ -100,6 +100,7 @@ export interface ChildProfileSummary {
   name: string;
   grade: number;
   pipColor: PipColor;
+  birthDate: string; // YYYY-MM-DD
 }
 
 export interface MeResponse {
@@ -116,4 +117,11 @@ export interface CreateChildInput {
   pipColor: PipColor;
   /** Explicit parental consent to processing the child's data. Always true — the literal type forces the checkbox. */
   consent: true;
+}
+
+export interface UpdateChildInput {
+  name?: string;
+  birthDate?: string; // YYYY-MM-DD
+  grade?: number;
+  pipColor?: PipColor;
 }

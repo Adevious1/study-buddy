@@ -98,3 +98,60 @@ describe('POST /api/me/children', () => {
     expect(row.consentAt).not.toBeNull();
   });
 });
+
+describe('PATCH /api/me/children/:childId', () => {
+  async function createChild(cookie: string): Promise<string> {
+    const res = await app.request('/api/me/children', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Zoe', birthDate: '2018-06-01', grade: 2, pipColor: 'sky', consent: true }),
+    });
+    const { id } = await res.json() as { id: string };
+    return id;
+  }
+
+  it('updates fields and returns the summary', async () => {
+    const { cookie } = await makeGuardian(`edit-${Date.now()}@test.dev`);
+    const id = await createChild(cookie);
+    const res = await app.request(`/api/me/children/${id}`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Zoey', grade: 3 }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { name: string; grade: number };
+    expect(body.name).toBe('Zoey');
+    expect(body.grade).toBe(3);
+  });
+
+  it("404s for another guardian's child", async () => {
+    const a = await makeGuardian(`edit-a-${Date.now()}@test.dev`);
+    const b = await makeGuardian(`edit-b-${Date.now()}@test.dev`);
+    const id = await createChild(a.cookie);
+    const res = await app.request(`/api/me/children/${id}`, {
+      method: 'PATCH',
+      headers: { Cookie: b.cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Hacked' }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('400s on an empty patch', async () => {
+    const { cookie } = await makeGuardian(`edit-e-${Date.now()}@test.dev`);
+    const id = await createChild(cookie);
+    const res = await app.request(`/api/me/children/${id}`, {
+      method: 'PATCH',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('GET /api/me children include birthDate', async () => {
+    const { cookie } = await makeGuardian(`bd-${Date.now()}@test.dev`);
+    await createChild(cookie);
+    const me = await app.request('/api/me', { headers: { Cookie: cookie } });
+    const body = await me.json() as MeResponse;
+    expect(body.children[0].birthDate).toBe('2018-06-01');
+  });
+});
