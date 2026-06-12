@@ -48,6 +48,9 @@ export function ConfirmDangerModal({
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           autoFocus
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
           aria-label={'Type ' + confirmWord + ' to confirm'}
           onKeyDown={(e) => { if (e.key === 'Enter') void go(); if (e.key === 'Escape') onClose(); }}
           className="mt-2 w-full rounded-2xl border-[1.5px] border-line px-3 py-2 font-body text-[15px] text-ink"

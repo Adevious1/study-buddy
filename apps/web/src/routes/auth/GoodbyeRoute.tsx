@@ -1,7 +1,10 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Pip } from '../../components/Pip';
 
 export function GoodbyeRoute() {
+  if (sessionStorage.getItem('sb-account-deleted') !== '1') {
+    return <Navigate to="/" replace />;
+  }
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center">
       <Pip size={96} state="idle" color="var(--color-coral)" expression="happy" />

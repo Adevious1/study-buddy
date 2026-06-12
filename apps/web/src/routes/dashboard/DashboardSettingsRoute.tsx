@@ -158,6 +158,7 @@ export function DashboardSettingsRoute() {
             }
             setActiveChild(null);
             await signOut().catch(() => {}); // server session is already gone; clear client state
+            sessionStorage.setItem('sb-account-deleted', '1');
             window.location.assign('/goodbye');
             return null;
           }}
