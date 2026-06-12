@@ -35,13 +35,24 @@ describe('deleteAccount', () => {
     expect((await db.select().from(guardians).where(eq(guardians.id, guardianId))).length).toBe(0);
   });
 
-  it('aborts (deletes nothing) when the cancel throws', async () => {
+  it('aborts (deletes nothing) when the cancel throws, and chains the cause', async () => {
     const { guardianId } = await makeGuardian(`abort-${Date.now()}@test.dev`);
     await db.update(subscriptions).set({ stripeSubscriptionId: 'sub_test_err' })
       .where(eq(subscriptions.guardianId, guardianId));
-    await expect(
-      deleteAccount(guardianId, async () => { throw new Error('stripe down'); }),
-    ).rejects.toBeInstanceOf(StripeCancelError);
+    const err = await deleteAccount(guardianId, async () => { throw new Error('stripe down'); }).catch((e) => e);
+    expect(err).toBeInstanceOf(StripeCancelError);
+    expect((err as Error).cause).toBeInstanceOf(Error);
     expect((await db.select().from(guardians).where(eq(guardians.id, guardianId))).length).toBe(1);
+  });
+
+  it('skips the Stripe call when the subscription is already canceled (Portal-cancelled guardian)', async () => {
+    const { guardianId } = await makeGuardian(`portal-${Date.now()}@test.dev`);
+    await db.update(subscriptions)
+      .set({ stripeSubscriptionId: 'sub_already_gone', status: 'canceled' })
+      .where(eq(subscriptions.guardianId, guardianId));
+    let cancelCalled = false;
+    await deleteAccount(guardianId, async () => { cancelCalled = true; throw new Error('must not be called'); });
+    expect(cancelCalled).toBe(false);
+    expect((await db.select().from(guardians).where(eq(guardians.id, guardianId))).length).toBe(0);
   });
 });

@@ -8,8 +8,8 @@ export type CancelFn = (subscriptionId: string) => Promise<void>;
 /** Thrown when Stripe cancellation fails; the account is NOT deleted. */
 export class StripeCancelError extends Error {
   constructor(cause: unknown) {
-    super('Stripe subscription cancel failed');
-    this.cause = cause;
+    super('Stripe subscription cancel failed', { cause });
+    this.name = 'StripeCancelError';
   }
 }
 
@@ -25,7 +25,8 @@ export async function deleteAccount(guardianId: string, cancel: CancelFn = cance
   const [g] = await db.select().from(guardians).where(eq(guardians.id, guardianId)).limit(1);
   if (!g) return; // already gone — idempotent
   const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.guardianId, guardianId)).limit(1);
-  if (sub?.stripeSubscriptionId) {
+  // Portal-cancelled subs keep their id with status 'canceled' — re-cancelling would error and brick deletion.
+  if (sub?.stripeSubscriptionId && sub.status !== 'canceled') {
     try {
       await cancel(sub.stripeSubscriptionId);
     } catch (e) {
