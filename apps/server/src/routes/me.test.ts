@@ -5,7 +5,7 @@ import { makeGuardian, signInGuardian } from '../../test/authHarness';
 import type { MeResponse } from '@study-buddy/shared';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { children, guardians, sessions, sessionSnapshots, session } from '../db/schema';
+import { children, guardians, sessions, sessionSnapshots, session, subscriptions } from '../db/schema';
 
 describe('GET /api/me', () => {
   beforeAll(async () => {
@@ -215,6 +215,16 @@ describe('DELETE /api/me/children/:childId', () => {
     });
     expect(res.status).toBe(404);
     expect((await db.select().from(children).where(eq(children.id, id))).length).toBe(1);
+  });
+
+  it('deletes even when the subscriptions row is missing (seat sync best-effort)', async () => {
+    const { cookie, guardianId } = await makeGuardian(`del-nosub-${Date.now()}@test.dev`);
+    const id = await createChild(cookie);
+    await db.delete(subscriptions).where(eq(subscriptions.guardianId, guardianId));
+    const res = await app.request(`/api/me/children/${id}`, {
+      method: 'DELETE', headers: { Cookie: cookie },
+    });
+    expect(res.status).toBe(204);
   });
 });
 

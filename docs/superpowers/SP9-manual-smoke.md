@@ -60,8 +60,12 @@ and API flow.
 
 ### Stale-session reset (PIN reset with an old session)
 
-- [ ] Sign in and wait **more than 5 minutes** without visiting `/pin-reset` (or simulate by back-dating `signedInAt` in the session store if available).
-- [ ] Submit the `/pin-reset` form → server returns a **restart response** (303-style redirect or `restart` JSON); the client restarts the sign-in flow — no dead end, no silent failure.
+- [ ] Simulate a stale session by back-dating the `session.created_at` column in psql:
+  ```sql
+  UPDATE session SET created_at = created_at - interval '10 minutes'
+  WHERE user_id = (SELECT user_id FROM guardians WHERE email = 'your@email.dev');
+  ```
+- [ ] Submit the `/pin-reset` form → server returns **HTTP 403 `{error: {code: 'stale_session'}}`**; the client then sets the PIN-reset flag, signs the guardian out, and redirects to `/login` — no dead end, no silent failure.
 
 ### Account delete (throwaway guardian only)
 

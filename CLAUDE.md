@@ -58,7 +58,7 @@ director-cue rule in `study-buddy.md`, and `test/voice/relay.test.ts` +
 (`SP8-manual-smoke.md`).
 
 SP9 (account lifecycle & compliance): guardian settings page at
-`/dashboard/settings` behind the PIN gate — edit child (name/grade/Pip
+`/dashboard/settings` behind the PIN gate — edit child (name / grade / birthdate / Pip
 color); delete child with a typed-name confirm modal, cascade wipe of all
 child data, and Stripe seat decrement; delete account with a typed-`DELETE`
 confirm, Stripe cancel-first then auth-user cascade delete, signs the
@@ -253,7 +253,7 @@ implementation cycle. **Do not collapse these into one effort.**
    browser↔relay (child-network) reconnect remains deferred. Pending human mic
    smoke (`SP8-manual-smoke.md`).
 9. **Account lifecycle & compliance** ✓ _implemented_ — guardian settings page
-   (`/dashboard/settings`) behind the PIN gate: edit child (name/grade/color),
+   (`/dashboard/settings`) behind the PIN gate: edit child (name / grade / birthdate / Pip color),
    delete child (typed-name confirm + cascade wipe + Stripe seat decrement),
    delete account (typed-`DELETE` confirm, Stripe cancel then auth-user cascade,
    signs out everywhere, `/goodbye`); PIN change with lockout; Forgot-PIN
