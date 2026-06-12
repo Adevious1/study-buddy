@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { SectionTitle } from '../../components/ui/SectionTitle';
 import { ChildForm, type ChildFormValues } from '../../components/ChildForm';
 import { ConfirmDangerModal } from '../../components/ConfirmDangerModal';
+import { ErrorState } from '../../components/atoms/ErrorState';
 import { useActiveChild } from '../../state/ChildProfileContext';
 import { repositoryMe } from '../auth/me';
 import { openPortal, startCheckout } from '../billing/billingClient';
@@ -19,6 +20,7 @@ export function DashboardSettingsRoute() {
   const meQ = useQuery({ queryKey: ['me'], queryFn: repositoryMe });
   const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
 
+  if (meQ.isError) return <ErrorState onRetry={() => meQ.refetch()} />;
   if (meQ.isPending || !meQ.data) return <div className="min-h-screen bg-bg" />;
   const me = meQ.data;
 
@@ -32,6 +34,7 @@ export function DashboardSettingsRoute() {
     }).catch(() => null);
     if (!res || !res.ok) return 'Could not save. Please try again.';
     await qc.invalidateQueries({ queryKey: ['me'] });
+    await qc.invalidateQueries({ queryKey: ['child', id] });
     return null;
   };
 
@@ -62,6 +65,9 @@ export function DashboardSettingsRoute() {
         {/* ── Children ── */}
         <SectionTitle>Children</SectionTitle>
         <div className="flex flex-col gap-4" style={{ marginTop: 10, marginBottom: 28 }}>
+          {me.children.length === 0 && (
+            <p className="font-body text-[14px] text-ink-3">No child profiles. Add one from the app's profile picker.</p>
+          )}
           {me.children.map((child) => (
             <Card key={child.id} style={{ borderRadius: 22, padding: 20 }}>
               <div className="font-display text-[18px] font-bold text-ink" style={{ marginBottom: 12 }}>

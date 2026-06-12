@@ -35,8 +35,11 @@ export function ConfirmDangerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 px-6">
-      <Card style={{ borderRadius: 22, padding: 24, maxWidth: 420, width: '100%' }}>
-        <div className="font-display text-[20px] font-extrabold text-ink">{title}</div>
+      <div role="dialog" aria-modal="true" aria-labelledby="danger-modal-title" style={{ maxWidth: 420, width: '100%' }}>
+      <Card
+        style={{ borderRadius: 22, padding: 24, width: '100%' }}
+      >
+        <div id="danger-modal-title" className="font-display text-[20px] font-extrabold text-ink">{title}</div>
         <p className="font-body text-[14px] text-ink-2" style={{ marginTop: 8, lineHeight: 1.5 }}>{body}</p>
         <p className="font-body text-[13px] font-bold text-ink-3" style={{ marginTop: 14 }}>
           Type <span className="font-mono text-ink">{confirmWord}</span> to confirm:
@@ -44,6 +47,9 @@ export function ConfirmDangerModal({
         <input
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
+          autoFocus
+          aria-label={'Type ' + confirmWord + ' to confirm'}
+          onKeyDown={(e) => { if (e.key === 'Enter') void go(); if (e.key === 'Escape') onClose(); }}
           className="mt-2 w-full rounded-2xl border-[1.5px] border-line px-3 py-2 font-body text-[15px] text-ink"
         />
         {error && <p className="font-body text-[13px] text-coral" style={{ marginTop: 10 }}>{error}</p>}
@@ -54,6 +60,7 @@ export function ConfirmDangerModal({
           </Button>
         </div>
       </Card>
+      </div>
     </div>
   );
 }
