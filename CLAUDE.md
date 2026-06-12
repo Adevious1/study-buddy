@@ -15,9 +15,9 @@ SP5 (billing), and SP6 (session recap) are all done. SP7 (camera vision /
 "Show Pip") is implemented, pending its human mic smoke
 (`SP7-manual-smoke.md`). SP8 (reconnect / longer sessions) is implemented,
 pending its human mic smoke (`SP8-manual-smoke.md`). SP9 (account lifecycle
-& compliance) is implemented, pending its human smoke
-(`SP9-manual-smoke.md`). All nine subsystems are merged to `main`; the
-feature branches are deleted.**
+& compliance) is done — browser smoke verified 2026-06-12
+(`SP9-manual-smoke.md`; only the live-Stripe cancel check is tabled). All
+nine subsystems are merged to `main`; the feature branches are deleted.**
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
@@ -73,7 +73,8 @@ files: `apps/server/src/routes/me.ts`,
 `apps/web/src/routes/dashboard/DashboardSettingsRoute.tsx`,
 `apps/web/src/components/ChildForm.tsx` / `ConfirmDangerModal.tsx`,
 `apps/web/src/routes/auth/PinResetRoute.tsx` / `GoodbyeRoute.tsx`, and the
-legal routes. Pending human smoke (`SP9-manual-smoke.md`).
+legal routes. Browser smoke ✅ verified 2026-06-12 (`SP9-manual-smoke.md`;
+live-Stripe cancel check tabled).
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -176,9 +177,14 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
   real device + human mic session crossing the ~10-min Gemini connection reset
   (brief `'resuming'` flash, seamless audio continuation, director-cue nudge,
   fallback-to-recap on retry exhaustion).
-- `SP9-manual-smoke.md` (account lifecycle & compliance) — ❌ **pending**: needs a
-  browser + running stack (localhost env) to walk the settings, edit/delete child,
-  delete account, PIN change, forgot-PIN, consent checkbox, and legal pages.
+- `SP9-manual-smoke.md` (account lifecycle & compliance) — ✅ **verified** via a
+  Playwright run (2026-06-12) on a throwaway guardian: consent gating + `consent_at`
+  stamp, settings (edit/delete child incl. last-child → onboarding PIN-skip), PIN
+  change + 429 lockout, forgot-PIN loop, stale-session 403 restart, account delete →
+  `/goodbye` with full cascade verified in psql + all-session 401. Only the
+  live-Stripe cancel check is tabled (needs test creds, like SP5). Run surfaced an
+  ops step: **after merging a migration, run `db:migrate` against the dev stack**
+  (`docker exec study-buddy-server-1 sh -c 'cd /app/apps/server && bun run db:migrate'`).
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
@@ -259,7 +265,8 @@ implementation cycle. **Do not collapse these into one effort.**
    signs out everywhere, `/goodbye`); PIN change with lockout; Forgot-PIN
    (`/pin-reset`) with stale-session restart; `POST /pin` first-set-only; parental
    consent checkbox stamping `children.consent_at`; public `/privacy` + `/terms`
-   with login consent line. Pending human smoke (`SP9-manual-smoke.md`).
+   with login consent line. Browser smoke ✅ verified 2026-06-12
+   (`SP9-manual-smoke.md`; live-Stripe cancel check tabled).
 
 ## Planned layout (pnpm monorepo)
 
