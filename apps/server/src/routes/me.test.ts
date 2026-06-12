@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
 import { ensureTestDb, setDatabaseUrl, migrateAndSeedTestDb } from '../../test/setup';
 import { app } from '../index';
-import { makeGuardian } from '../../test/authHarness';
+import { makeGuardian, signInGuardian } from '../../test/authHarness';
 import type { MeResponse } from '@study-buddy/shared';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
@@ -219,12 +219,16 @@ describe('DELETE /api/me/children/:childId', () => {
 });
 
 describe('DELETE /api/me', () => {
-  it('deletes the account and invalidates the session cookie', async () => {
-    const { cookie, guardianId } = await makeGuardian(`bye-${Date.now()}@test.dev`);
+  it('deletes the account and invalidates ALL sessions', async () => {
+    const email = `bye-${Date.now()}@test.dev`;
+    const { cookie, guardianId } = await makeGuardian(email);
+    const secondCookie = await signInGuardian(email, 'test-password-123');
     const res = await app.request('/api/me', { method: 'DELETE', headers: { Cookie: cookie } });
     expect(res.status).toBe(204);
     expect((await db.select().from(guardians).where(eq(guardians.id, guardianId))).length).toBe(0);
     const after = await app.request('/api/me', { headers: { Cookie: cookie } });
     expect(after.status).toBe(401);
+    const afterSecond = await app.request('/api/me', { headers: { Cookie: secondCookie } });
+    expect(afterSecond.status).toBe(401);
   });
 });

@@ -76,5 +76,13 @@ export async function constructWebhookEvent(rawBody: string, signature: string):
 
 /** Immediate cancellation — used by account deletion. No proration handling. */
 export async function cancelSubscription(subscriptionId: string): Promise<void> {
-  await stripeClient().subscriptions.cancel(subscriptionId);
+  try {
+    await stripeClient().subscriptions.cancel(subscriptionId);
+  } catch (e) {
+    // A mid-delete retry can race the cancellation webhook: if Stripe already
+    // has the sub canceled, the goal is achieved — don't brick the deletion.
+    const sub = await stripeClient().subscriptions.retrieve(subscriptionId).catch(() => null);
+    if (sub?.status === 'canceled') return;
+    throw e;
+  }
 }
