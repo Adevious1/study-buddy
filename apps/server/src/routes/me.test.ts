@@ -254,6 +254,12 @@ describe('PIN change', () => {
       body: JSON.stringify({ pin: '2222' }),
     });
     expect(verify.status).toBe(204);
+    const oldPin = await app.request('/api/me/pin/verify', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: '1111' }),
+    });
+    expect(oldPin.status).toBe(401);
   });
 });
 
