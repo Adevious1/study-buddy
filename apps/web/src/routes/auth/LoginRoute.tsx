@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { signIn } from '../../auth/authClient';
 import { Pip } from '../../components/Pip';
 import { Button } from '../../components/ui/Button';
@@ -68,6 +69,11 @@ export function LoginRoute() {
           {error}
         </p>
       )}
+      <p className="font-body text-[11px] text-ink-3" style={{ marginTop: 24, maxWidth: 280, textAlign: 'center' }}>
+        By continuing, you agree to our{' '}
+        <Link to="/terms" className="underline">Terms</Link> and{' '}
+        <Link to="/privacy" className="underline">Privacy Policy</Link>.
+      </p>
     </div>
   );
 }

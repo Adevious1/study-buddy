@@ -13,6 +13,8 @@ import { SwitchRoute } from './routes/onboarding/SwitchRoute';
 import { RequireGuardian } from './routes/auth/RequireGuardian';
 import { RequireDashboardPin } from './routes/auth/RequireDashboardPin';
 import { SubscribeRoute } from './routes/billing/SubscribeRoute';
+import { PrivacyRoute } from './routes/legal/PrivacyRoute';
+import { TermsRoute } from './routes/legal/TermsRoute';
 
 export default function App() {
   return (
@@ -21,6 +23,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/app" replace />} />
           <Route path="/login" element={<LoginRoute />} />
+          <Route path="/privacy" element={<PrivacyRoute />} />
+          <Route path="/terms" element={<TermsRoute />} />
           <Route
             path="/onboarding"
             element={
