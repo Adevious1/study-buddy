@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
    lawyer-approved. Do not remove sections; replace wording in place. */
 export function TermsRoute() {
   return (
+    <div className="min-h-screen bg-bg">
     <div className="mx-auto max-w-[640px] px-6 py-10">
       <Link to="/login" className="font-body text-[13px] font-bold text-coral">← Back</Link>
       <h1 className="font-display text-[28px] font-extrabold text-ink" style={{ marginTop: 12 }}>
@@ -29,6 +30,7 @@ export function TermsRoute() {
         <h2 className="font-display text-[18px] font-bold text-ink" style={{ marginTop: 20 }}>Contact</h2>
         <p style={{ marginTop: 8 }}>Questions? Email support@studybuddy.dev.</p>
       </div>
+    </div>
     </div>
   );
 }
