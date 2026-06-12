@@ -18,7 +18,7 @@ describe('entitlement enforcement', () => {
     await db.update(subscriptions).set({ trialEndsAt: new Date(Date.now() - 1000) }).where(eq(subscriptions.guardianId, guardianId));
     const res = await app.request('/api/me/children', {
       method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Nope', birthDate: '2019-01-01', grade: 1, pipColor: 'sky' }),
+      body: JSON.stringify({ name: 'Nope', birthDate: '2019-01-01', grade: 1, pipColor: 'sky', consent: true }),
     });
     expect(res.status).toBe(402);
   });
@@ -27,7 +27,7 @@ describe('entitlement enforcement', () => {
     const { cookie } = await makeGuardian(`ok-${Date.now()}@test.dev`);
     const res = await app.request('/api/me/children', {
       method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Yep', birthDate: '2019-01-01', grade: 1, pipColor: 'mint' }),
+      body: JSON.stringify({ name: 'Yep', birthDate: '2019-01-01', grade: 1, pipColor: 'mint', consent: true }),
     });
     expect(res.status).toBe(201);
   });

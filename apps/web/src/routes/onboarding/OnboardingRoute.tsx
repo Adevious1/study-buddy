@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Pip } from '../../components/Pip';
 import { Button } from '../../components/ui/Button';
 import { AddChildForm } from './AddChildForm';
+import { repositoryMe } from '../auth/me';
 
 const base = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
 
@@ -11,6 +13,13 @@ export function OnboardingRoute() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const meQ = useQuery({ queryKey: ['me'], queryFn: repositoryMe });
+
+  // Skip PIN step when a PIN already exists (avoids 409 dead-end on re-entry).
+  useEffect(() => {
+    if (meQ.data?.hasPin) setStep('child');
+  }, [meQ.data?.hasPin]);
 
   const savePin = async () => {
     setError(null);
@@ -30,12 +39,17 @@ export function OnboardingRoute() {
       setError('Could not save PIN. Please try again.');
       return;
     }
-    if (!res.ok) {
+    // 409 means a PIN already exists — treat as success (stale cache defense).
+    if (!res.ok && res.status !== 409) {
       setError('Could not save PIN.');
       return;
     }
     setStep('child');
   };
+
+  // Hold rendering until we know whether a PIN exists, so we never flash the
+  // PIN step for a guardian who already set one.
+  if (meQ.isPending) return <div className="min-h-screen bg-bg" />;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-6">

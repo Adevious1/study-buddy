@@ -7,12 +7,17 @@ import { ProfileRoute } from './routes/app/ProfileRoute';
 import { VoiceRoute } from './routes/app/VoiceRoute';
 import { RecapRoute } from './routes/app/RecapRoute';
 import { DashboardRoute } from './routes/dashboard/DashboardRoute';
+import { DashboardSettingsRoute } from './routes/dashboard/DashboardSettingsRoute';
 import { LoginRoute } from './routes/auth/LoginRoute';
+import { GoodbyeRoute } from './routes/auth/GoodbyeRoute';
 import { OnboardingRoute } from './routes/onboarding/OnboardingRoute';
 import { SwitchRoute } from './routes/onboarding/SwitchRoute';
 import { RequireGuardian } from './routes/auth/RequireGuardian';
 import { RequireDashboardPin } from './routes/auth/RequireDashboardPin';
 import { SubscribeRoute } from './routes/billing/SubscribeRoute';
+import { PrivacyRoute } from './routes/legal/PrivacyRoute';
+import { TermsRoute } from './routes/legal/TermsRoute';
+import { PinResetRoute } from './routes/auth/PinResetRoute';
 
 export default function App() {
   return (
@@ -21,6 +26,9 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/app" replace />} />
           <Route path="/login" element={<LoginRoute />} />
+          <Route path="/goodbye" element={<GoodbyeRoute />} />
+          <Route path="/privacy" element={<PrivacyRoute />} />
+          <Route path="/terms" element={<TermsRoute />} />
           <Route
             path="/onboarding"
             element={
@@ -66,6 +74,24 @@ export default function App() {
                 <RequireDashboardPin>
                   <DashboardRoute />
                 </RequireDashboardPin>
+              </RequireGuardian>
+            }
+          />
+          <Route
+            path="/dashboard/settings"
+            element={
+              <RequireGuardian>
+                <RequireDashboardPin>
+                  <DashboardSettingsRoute />
+                </RequireDashboardPin>
+              </RequireGuardian>
+            }
+          />
+          <Route
+            path="/pin-reset"
+            element={
+              <RequireGuardian>
+                <PinResetRoute />
               </RequireGuardian>
             }
           />

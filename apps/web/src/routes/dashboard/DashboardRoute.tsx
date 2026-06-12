@@ -27,31 +27,57 @@ export function DashboardRoute() {
   const studentQ = useQuery({
     queryKey: ['child', childId, 'student'],
     queryFn: () => repository.getStudent(),
+    enabled: !!childId,
   });
   const continueQ = useQuery({
     queryKey: ['child', childId, 'continueSession'],
     queryFn: () => repository.getContinueSession(),
+    enabled: !!childId,
   });
   const weekActivityQ = useQuery({
     queryKey: ['child', childId, 'weekActivity'],
     queryFn: () => repository.getWeekActivity(),
+    enabled: !!childId,
   });
   const assignmentsQ = useQuery({
     queryKey: ['child', childId, 'assignments'],
     queryFn: () => repository.getTodayAssignments(),
+    enabled: !!childId,
   });
   const snapshotsQ = useQuery({
     queryKey: ['child', childId, 'snapshots'],
     queryFn: () => repository.getRecentSnapshots(),
+    enabled: !!childId,
   });
   // Nullable like on /app/profile: a brand-new child has no learning profile
   // until their first session writes one (404 → null). Never gates the page.
   const learningProfileQ = useQuery({
     queryKey: ['child', childId, 'learningProfile'],
     queryFn: () => repository.getLearningProfile(),
+    enabled: !!childId,
   });
   const meQ = useQuery({ queryKey: ['me'], queryFn: repositoryMe });
   const ent = meQ.data?.entitlement;
+
+  // meQ loading / error guards first (meQ is always enabled).
+  if (meQ.isPending || !meQ.data) return <div className="min-h-screen w-full bg-bg" />;
+
+  // Zero-children short-circuit — must come before child-scoped query guards
+  // because those queries are disabled (isPending stays true forever) when
+  // childId is null.
+  if (meQ.data.children.length === 0) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-6 text-center">
+        <h1 className="font-display text-[24px] font-extrabold text-ink">No child profiles yet</h1>
+        <p className="font-body text-[14px] font-semibold text-ink-3" style={{ marginTop: 8 }}>
+          Add a child to start learning with Pip.
+        </p>
+        <div style={{ marginTop: 16 }}>
+          <Button kind="primary" size="lg" onClick={() => navigate('/onboarding')}>Add a child</Button>
+        </div>
+      </div>
+    );
+  }
 
   // The continue session is optional (null when nothing is in progress) and
   // never gates the dashboard.
@@ -129,6 +155,15 @@ export function DashboardRoute() {
         >
           <div className="w-2 h-2 rounded-full bg-ink-4" />
           How I learn
+        </Link>
+
+        <Link
+          to="/dashboard/settings"
+          className="flex items-center gap-3 rounded-[14px] font-bold text-[14px] text-ink-2 cursor-pointer no-underline hover:bg-bg-2 transition-colors"
+          style={{ padding: '12px 14px' }}
+        >
+          <div className="w-2 h-2 rounded-full bg-ink-4" />
+          Settings
         </Link>
 
         {/* Spacer */}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pip } from '../../components/Pip';
 import { Button } from '../../components/ui/Button';
+import { signOut } from '../../auth/authClient';
 
 const base = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
 
@@ -69,6 +70,17 @@ export function DashboardPinGate({ onUnlocked }: { onUnlocked: () => void }) {
           Unlock
         </Button>
       </div>
+      <button
+        className="font-body text-[12px] text-ink-3 underline cursor-pointer bg-transparent border-0"
+        style={{ marginTop: 14 }}
+        onClick={async () => {
+          sessionStorage.setItem('pinReset', '1');
+          await signOut();
+          window.location.assign('/login');
+        }}
+      >
+        Forgot PIN?
+      </button>
     </div>
   );
 }

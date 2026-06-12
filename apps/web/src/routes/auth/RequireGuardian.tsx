@@ -15,6 +15,11 @@ export function RequireGuardian({ children }: { children: ReactNode }) {
 
   if (isPending) return <div className="min-h-screen bg-bg" />;
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  // Forgot-PIN flow: the gate set this flag before signing out; the fresh
+  // sign-in lands here, and we detour to the set-new-PIN screen once.
+  if (sessionStorage.getItem('pinReset') === '1' && location.pathname !== '/pin-reset') {
+    return <Navigate to="/pin-reset" replace />;
+  }
   // The onboarding routing only applies on /app — only there do we need to wait
   // for the ['me'] query. /onboarding and /switch render immediately (they fetch
   // their own data), avoiding a blank screen while ['me'] loads.
