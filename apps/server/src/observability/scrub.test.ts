@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { scrubEvent, scrubContext } from './scrub';
+import { scrubEvent, scrubContext, type ScrubbableEvent } from './scrub';
 
 describe('scrubContext', () => {
   it('keeps allowlisted keys and drops everything else', () => {
@@ -19,7 +19,7 @@ describe('scrubContext', () => {
 
 describe('scrubEvent', () => {
   it('drops request body, cookies, and headers', () => {
-    const event = scrubEvent({
+    const input: ScrubbableEvent = {
       request: {
         url: 'http://x/api/me/children',
         method: 'POST',
@@ -27,26 +27,30 @@ describe('scrubEvent', () => {
         cookies: { 'better-auth.session_token': 'secret' },
         headers: { cookie: 'secret', authorization: 'Bearer x' },
       },
-    });
+    };
+    const event = scrubEvent(input);
     expect(event.request).toEqual({ url: 'http://x/api/me/children', method: 'POST' });
   });
 
   it('reduces user to id only', () => {
-    const event = scrubEvent({ user: { id: 'g-1', email: 'parent@x.com', username: 'Jude', ip_address: '1.2.3.4' } });
+    const input: ScrubbableEvent = { user: { id: 'g-1', email: 'parent@x.com', username: 'Jude', ip_address: '1.2.3.4' } };
+    const event = scrubEvent(input);
     expect(event.user).toEqual({ id: 'g-1' });
   });
 
   it('filters extra and tags through the allowlist', () => {
-    const event = scrubEvent({
+    const input: ScrubbableEvent = {
       extra: { childId: 'c-1', transcript: 'secret words' },
       tags: { tag: 'snapshot-save', childName: 'Maya' },
-    });
+    };
+    const event = scrubEvent(input);
     expect(event.extra).toEqual({ childId: 'c-1' });
     expect(event.tags).toEqual({ tag: 'snapshot-save' });
   });
 
   it('passes through an event with none of the scrubbable fields', () => {
-    const event = scrubEvent({ message: 'boom' });
+    const input: ScrubbableEvent = { message: 'boom' };
+    const event = scrubEvent(input);
     expect(event.message).toBe('boom');
   });
 });

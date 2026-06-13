@@ -3,6 +3,8 @@
  * not denylist: unknown extra/tag keys are dropped by default, so a future
  * careless capture cannot leak transcripts, child names, or photos. Allowed
  * IDs are pseudonymous UUIDs, safe for cross-event correlation.
+ * String-valued allowlist keys (`reason`, `state`, `code`) must carry short,
+ * controlled values (enums, status codes) — never free text from user input.
  */
 const ALLOWED_CONTEXT_KEYS = new Set([
   'tag', 'childId', 'sessionId', 'guardianId', 'stripeCustomerId',
@@ -24,17 +26,18 @@ export interface ScrubbableEvent {
   [k: string]: unknown;
 }
 
-export function scrubEvent(event: ScrubbableEvent): ScrubbableEvent {
-  if (event.request) {
-    event.request = {
-      ...(event.request.url !== undefined ? { url: event.request.url } : {}),
-      ...(event.request.method !== undefined ? { method: event.request.method } : {}),
+export function scrubEvent<E extends ScrubbableEvent>(event: E): E {
+  const e: ScrubbableEvent = event;
+  if (e.request) {
+    e.request = {
+      ...(e.request.url !== undefined ? { url: e.request.url } : {}),
+      ...(e.request.method !== undefined ? { method: e.request.method } : {}),
     };
   }
-  if (event.user) {
-    event.user = event.user.id !== undefined ? { id: event.user.id } : {};
+  if (e.user) {
+    e.user = e.user.id !== undefined ? { id: e.user.id } : {};
   }
-  if (event.extra) event.extra = scrubContext(event.extra);
-  if (event.tags) event.tags = scrubContext(event.tags) as Record<string, unknown>;
+  if (e.extra) e.extra = scrubContext(e.extra);
+  if (e.tags) e.tags = scrubContext(e.tags);
   return event;
 }
