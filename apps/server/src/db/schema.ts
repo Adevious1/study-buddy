@@ -163,7 +163,7 @@ export const sessions = pgTable(
     insightBadge: text('insight_badge'),
     // SP10 outcome signals: which path produced the recap, and how many
     // transparent Gemini reconnects (SP8) the session survived.
-    recapSource: text('recap_source'),
+    recapSource: text('recap_source').$type<'model' | 'fallback'>(),
     reconnectCount: integer('reconnect_count').notNull().default(0),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     endedAt: timestamp('ended_at', { withTimezone: true }),

@@ -63,7 +63,7 @@ export async function finalizeLiveSession(
             insightBadge: extra.recap.insightBadge,
           }
         : {}),
-      ...(extra.recapSource ? { recapSource: extra.recapSource } : {}),
+      ...(extra.recapSource !== undefined ? { recapSource: extra.recapSource } : {}),
       ...(extra.reconnectCount !== undefined ? { reconnectCount: extra.reconnectCount } : {}),
     })
     .where(eq(sessions.id, id));
