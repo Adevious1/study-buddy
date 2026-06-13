@@ -10,6 +10,7 @@ import { TranscriptAccumulator, stripTextArtifact } from './transcript';
 import { generateRecap, type RecapGenerator } from '../recap/generateRecap';
 import type { GeminiConnector, GeminiLiveSession, GeminiEvents } from './geminiSession';
 import { saveSnapshot } from './snapshots';
+import { reportError, reportSignal } from '../observability/reportError';
 
 export interface RelaySink {
   sendControl: (m: ServerControl) => void;
@@ -55,6 +56,7 @@ export function createRelay(opts: RelayOptions) {
   let capTimer: ReturnType<typeof setTimeout> | null = null;
   let nudgeTimer: ReturnType<typeof setTimeout> | null = null;
   let systemInstruction = '';
+  let reconnectCount = 0;
   // True while a Pip turn is mid-stream (deltas still arriving); the leading
   // "Text " artifact is only stripped on the first delta of each turn.
   let pipTurnOpen = false;
@@ -140,6 +142,7 @@ export function createRelay(opts: RelayOptions) {
         if ((state as State) === 'ended') { try { await next.close(); } catch { /* ignore */ } return; }
         session = next;
         state = 'live';
+        reconnectCount += 1;
         sink.sendControl({ type: 'status', state: 'live' });
         return;
       } catch {
@@ -149,6 +152,7 @@ export function createRelay(opts: RelayOptions) {
       }
     }
     if ((state as State) === 'ended') return;
+    reportSignal('reconnect-exhausted', { childId, sessionId: sessionRowId ?? undefined }, 'error');
     sink.sendControl({ type: 'error', code: 'connection-lost', message: 'Lost connection.' });
     await finish('completed');
   }
@@ -188,7 +192,8 @@ export function createRelay(opts: RelayOptions) {
         }
       }, Math.max(0, cap - lead));
       nudgeTimer.unref?.();
-    } catch {
+    } catch (err) {
+      reportError('voice-start', err, { childId });
       state = 'idle';
       sink.sendControl({ type: 'error', code: 'gemini-unavailable', message: 'Pip could not start.' });
     }
@@ -217,10 +222,15 @@ export function createRelay(opts: RelayOptions) {
             },
             opts.recapGenerator ?? null,
           );
-          await finalizeLiveSession(sessionRowId, 'completed', { transcript: turns, recap: recapResult.content });
+          await finalizeLiveSession(sessionRowId, 'completed', {
+            transcript: turns,
+            recap: recapResult.content,
+            recapSource: recapResult.source,
+            reconnectCount,
+          });
           await commitLearningProfile(childId, signals.all());
         } else {
-          await finalizeLiveSession(sessionRowId, 'abandoned', { transcript: turns });
+          await finalizeLiveSession(sessionRowId, 'abandoned', { transcript: turns, reconnectCount });
         }
       }
     } finally {
@@ -251,7 +261,7 @@ export function createRelay(opts: RelayOptions) {
     try {
       await saveSnapshot(sessionRowId, childId, bytes, mime);
     } catch (e) {
-      console.error('[snapshot] save failed', e);
+      reportError('snapshot-save', e, { sessionId: sessionRowId, childId });
     }
     sink.sendControl({ type: 'snapshot-ack', ok: true });
   }

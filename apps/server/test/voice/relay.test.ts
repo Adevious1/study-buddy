@@ -354,6 +354,70 @@ describe('voice relay', () => {
     await relay.handleControl({ type: 'end' }); // cancel the pending cap timer
   });
 
+  it('persists reconnectCount and recapSource after a survived Gemini reset', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    // No recapGenerator → generateRecap will use fallback (source: 'fallback')
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+    const ev = await fake.events();
+
+    // Trigger reconnect: deliver a resumption handle then close
+    ev.onResumptionHandle('handle-persist-test');
+    ev.onClose('reset');
+    await tick();
+
+    // Wait until the relay is back to 'live'
+    await waitFor(() => out.control.some((m) => m.type === 'status' && (m as { state: string }).state === 'live' &&
+      out.control.filter((m2) => m2.type === 'status' && (m2 as { state: string }).state === 'live').length >= 2));
+
+    // End the session so finish('completed') runs
+    await relay.handleControl({ type: 'end' });
+    await waitFor(() => hasEnded(out));
+
+    // Look up the session row the same way the existing recap test does
+    const { db } = await import('../../src/db/client');
+    const { sessions } = await import('../../src/db/schema');
+    const { and, desc, eq } = await import('drizzle-orm');
+    const [row] = await db.select().from(sessions)
+      .where(and(eq(sessions.childId, VOICE_TEST_CHILD_ID), eq(sessions.state, 'completed')))
+      .orderBy(desc(sessions.endedAt)).limit(1);
+
+    expect(row.reconnectCount).toBe(1);
+    // No recapGenerator passed → thin transcript or no-generator → source: 'fallback'
+    expect(row.recapSource).toBe('fallback');
+  });
+
+  it('persists reconnectCount on the abandoned path after a reconnect', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Word problems', title: 'Word problems' });
+    const ev = await fake.events();
+
+    // Trigger reconnect
+    ev.onResumptionHandle('handle-abandon-test');
+    ev.onClose('reset');
+    await tick();
+
+    // Wait until the relay is back to 'live' after the reconnect
+    await waitFor(() => fake.connectCount() >= 2);
+    await tick();
+
+    // Disconnect (abandoned path) instead of end
+    await relay.handleDisconnect();
+    await waitFor(() => hasEnded(out));
+
+    const { db } = await import('../../src/db/client');
+    const { sessions } = await import('../../src/db/schema');
+    const { and, desc, eq } = await import('drizzle-orm');
+    const [row] = await db.select().from(sessions)
+      .where(and(eq(sessions.childId, VOICE_TEST_CHILD_ID), eq(sessions.state, 'abandoned')))
+      .orderBy(desc(sessions.endedAt)).limit(1);
+
+    expect(row.reconnectCount).toBe(1);
+  });
+
   it('after exhausting reconnect retries, emits connection-lost and finalizes the session', async () => {
     let calls = 0;
     let captured: import('../../src/voice/geminiSession').GeminiEvents | null = null;
