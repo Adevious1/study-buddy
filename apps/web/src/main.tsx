@@ -18,11 +18,12 @@ const queryClient = new QueryClient({
         return;
       }
       // Breadcrumb only: the server already captures its own 500s; a second
-      // client-side event per failed request would just be noise.
+      // client-side event per failed request would just be noise. Static
+      // messages only — a dynamic err.message could carry child data.
       Sentry.addBreadcrumb({
         category: 'query',
         level: 'warning',
-        message: err instanceof Error ? err.message : String(err),
+        message: err instanceof ApiError ? `API ${err.status}` : 'query error',
       });
     },
   }),
