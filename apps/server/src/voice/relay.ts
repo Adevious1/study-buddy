@@ -207,7 +207,7 @@ export function createRelay(opts: RelayOptions) {
     try {
       if (sessionRowId) {
         if (finalState === 'completed') {
-          const recap = await generateRecap(
+          const recapResult = await generateRecap(
             {
               turns,
               childName,
@@ -217,7 +217,7 @@ export function createRelay(opts: RelayOptions) {
             },
             opts.recapGenerator ?? null,
           );
-          await finalizeLiveSession(sessionRowId, 'completed', { transcript: turns, recap });
+          await finalizeLiveSession(sessionRowId, 'completed', { transcript: turns, recap: recapResult.content });
           await commitLearningProfile(childId, signals.all());
         } else {
           await finalizeLiveSession(sessionRowId, 'abandoned', { transcript: turns });

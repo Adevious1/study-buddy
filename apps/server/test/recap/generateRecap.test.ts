@@ -23,10 +23,12 @@ const goodRaw = {
 describe('generateRecap', () => {
   it('returns parsed content when the generator succeeds', async () => {
     const gen: RecapGenerator = async () => goodRaw;
-    const r = await generateRecap(input, gen);
-    expect(r.starsEarned).toBe(3);
-    expect(r.starsMax).toBe(STARS_MAX);
-    expect(r.figuredOut[0].text).toBe('You added 2 and 3');
+    const result = await generateRecap(input, gen);
+    expect(result.source).toBe('model');
+    expect(result.content.starsEarned).toBe(3);
+    expect(result.content.starsMax).toBe(STARS_MAX);
+    expect(result.content.figuredOut[0].text).toBe('You added 2 and 3');
+    expect(result.reason).toBeUndefined();
   });
 
   it('passes the rendered instruction and transcript script to the generator', async () => {
@@ -45,33 +47,43 @@ describe('generateRecap', () => {
 
   it('falls back when the generator throws', async () => {
     const gen: RecapGenerator = async () => { throw new Error('boom'); };
-    const r = await generateRecap(input, gen);
-    expect(r).toEqual(fallbackRecap());
+    const result = await generateRecap(input, gen);
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('generation-failed');
+    expect(result.content).toEqual(fallbackRecap());
   });
 
   it('falls back when the generator returns garbage', async () => {
     const gen: RecapGenerator = async () => ({ nope: true });
-    const r = await generateRecap(input, gen);
-    expect(r).toEqual(fallbackRecap());
+    const result = await generateRecap(input, gen);
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('invalid-output');
+    expect(result.content).toEqual(fallbackRecap());
   });
 
   it('falls back when the generator exceeds the timeout', async () => {
     const gen: RecapGenerator = () => new Promise((resolve) => setTimeout(() => resolve(goodRaw), 50));
-    const r = await generateRecap(input, gen, 10); // 10ms timeout < 50ms generator
-    expect(r).toEqual(fallbackRecap());
+    const result = await generateRecap(input, gen, 10); // 10ms timeout < 50ms generator
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('timeout');
+    expect(result.content).toEqual(fallbackRecap());
   });
 
   it('falls back when no generator is provided', async () => {
-    const r = await generateRecap(input, null);
-    expect(r).toEqual(fallbackRecap());
+    const result = await generateRecap(input, null);
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('no-generator');
+    expect(result.content).toEqual(fallbackRecap());
   });
 
   it('falls back WITHOUT calling the model on an empty transcript', async () => {
     let called = false;
     const gen: RecapGenerator = async () => { called = true; return goodRaw; };
-    const r = await generateRecap({ ...input, turns: [] }, gen);
+    const result = await generateRecap({ ...input, turns: [] }, gen);
     expect(called).toBe(false);
-    expect(r).toEqual(fallbackRecap());
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('thin-transcript');
+    expect(result.content).toEqual(fallbackRecap());
   });
 
   it('falls back WITHOUT calling the model on a too-thin transcript', async () => {
@@ -81,9 +93,11 @@ describe('generateRecap', () => {
       { role: 'pip', text: 'Hi!' },
       { role: 'child', text: 'Bye.' },
     ];
-    const r = await generateRecap({ ...input, turns: thin }, gen);
+    const result = await generateRecap({ ...input, turns: thin }, gen);
     expect(called).toBe(false);
-    expect(r).toEqual(fallbackRecap());
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('thin-transcript');
+    expect(result.content).toEqual(fallbackRecap());
   });
 
   it('falls back WITHOUT calling the model when the child never spoke', async () => {
@@ -95,9 +109,18 @@ describe('generateRecap', () => {
       { role: 'pip', text: 'I will wait.' },
       { role: 'pip', text: 'Goodbye!' },
     ];
-    const r = await generateRecap({ ...input, turns: pipOnly }, gen);
+    const result = await generateRecap({ ...input, turns: pipOnly }, gen);
     expect(called).toBe(false);
-    expect(r).toEqual(fallbackRecap());
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('thin-transcript');
+    expect(result.content).toEqual(fallbackRecap());
+  });
+
+  it('labels a timeout fallback with reason "timeout"', async () => {
+    const hang: RecapGenerator = () => new Promise(() => {});
+    const result = await generateRecap(input, hang, 50);
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('timeout');
   });
 });
 
@@ -141,7 +164,9 @@ describe('makeRecapGeneratorFromModelCall (retry + backup plan)', () => {
     const gen = makeRecapGeneratorFromModelCall(call, ['a', 'b']);
     await expect(gen('inst', 'script')).rejects.toThrow('all-models-down');
     // composed with generateRecap, a fully-failed plan yields the encouraging fallback
-    const r = await generateRecap(input, gen);
-    expect(r).toEqual(fallbackRecap());
+    const result = await generateRecap(input, gen);
+    expect(result.source).toBe('fallback');
+    expect(result.reason).toBe('generation-failed');
+    expect(result.content).toEqual(fallbackRecap());
   });
 });
