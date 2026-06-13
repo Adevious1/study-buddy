@@ -14,6 +14,7 @@ import { auth } from './lib/auth';
 import { meRoute } from './routes/me';
 import { billingRoute } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripeWebhook';
+import { opsMetricsRoute } from './routes/opsMetrics';
 import { initSentry, installProcessHandlers } from './observability/sentry';
 import { reportError } from './observability/reportError';
 
@@ -23,6 +24,7 @@ app.route('/', healthRoute);
 // better-auth handler — public, must precede the child-scoped /api routes
 app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw));
 app.route('/api/stripe/webhook', stripeWebhookRoute);
+app.route('/api/ops', opsMetricsRoute);
 app.route('/api/me', meRoute);
 app.route('/api/me/billing', billingRoute);
 
