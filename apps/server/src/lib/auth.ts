@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import * as schema from '../db/schema';
 import { guardians, subscriptions } from '../db/schema';
+import { reportError } from '../observability/reportError';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -68,7 +69,7 @@ export const auth = betterAuth({
                 .onConflictDoNothing({ target: subscriptions.guardianId });
             }
           } catch (err) {
-            console.error('[auth] guardian/subscription create hook failed for user', createdUser.id, err);
+            reportError('auth-guardian-create-hook', err, { userId: createdUser.id });
             throw err;
           }
         },

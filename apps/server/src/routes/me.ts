@@ -10,6 +10,7 @@ import { getEntitlement, syncSeatQuantity } from '../lib/billing';
 import { deleteAccount, StripeCancelError } from '../lib/accountLifecycle';
 import { auth } from '../lib/auth';
 import type { MeResponse } from '@study-buddy/shared';
+import { reportError } from '../observability/reportError';
 
 export const meRoute = new Hono<{ Variables: GuardianVariables }>();
 meRoute.use('*', guardianContext);
@@ -39,7 +40,7 @@ meRoute.delete('/', async (c) => {
     await deleteAccount(g.id);
   } catch (e) {
     if (e instanceof StripeCancelError) {
-      console.error('[account-delete] stripe cancel failed', { guardianId: g.id }, e);
+      reportError('account-delete-stripe-cancel', e, { guardianId: g.id });
       return c.json({ error: { code: 'stripe_cancel_failed', message: 'Could not cancel your subscription. Please try again.' } }, 502);
     }
     throw e; // unexpected → onError 500
@@ -212,7 +213,7 @@ meRoute.delete('/children/:childId', async (c) => {
   try {
     await syncSeatQuantity(g.id);
   } catch (e) {
-    console.error('[child-delete] seat sync failed; quantity corrects on next seat sync', { guardianId: g.id, childId: child.id }, e);
+    reportError('child-delete-seat-sync', e, { guardianId: g.id, childId: child.id }, 'warning');
   }
   return c.body(null, 204);
 });
