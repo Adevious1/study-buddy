@@ -5,7 +5,7 @@ import {
   parseRecapContent, fallbackRecap, transcriptToScript,
   RECAP_RESPONSE_SCHEMA, type RecapContent,
 } from './recapContent';
-import { reportSignal } from '../observability/reportError';
+import { reportSignal, logInfo } from '../observability/reportError';
 
 // ─── Recap models — update these as Gemini ships newer models ──────────────────
 /** Primary non-streaming model for the post-session recap summary. */
@@ -72,8 +72,12 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/** Designed exit paths — countable in ops metrics via recap_source, but not Sentry-worthy. */
+const EXPECTED_FALLBACK_REASONS: ReadonlySet<RecapFallbackReason> = new Set(['thin-transcript', 'no-generator']);
+
 function fallbackResult(reason: RecapFallbackReason, extra: Record<string, unknown> = {}): RecapResult {
-  reportSignal('recap-fallback', { reason, ...extra });
+  if (EXPECTED_FALLBACK_REASONS.has(reason)) logInfo('recap-fallback', { reason, ...extra });
+  else reportSignal('recap-fallback', { reason, ...extra });
   return { content: fallbackRecap(), source: 'fallback', reason };
 }
 

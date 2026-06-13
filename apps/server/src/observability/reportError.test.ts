@@ -1,17 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { reportError, reportSignal, __setSentryForTests, __resetSentryForTests } from './reportError';
+import { reportError, reportSignal, logInfo, __setSentryForTests, __resetSentryForTests } from './reportError';
 
 type Captured = { kind: 'exception' | 'message'; value: unknown; ctx: Record<string, unknown> };
 let captured: Captured[] = [];
 let logged: string[] = [];
+let infoLogged: string[] = [];
 const origError = console.error;
 const origWarn = console.warn;
+const origInfo = console.info;
 
 beforeEach(() => {
   captured = [];
   logged = [];
+  infoLogged = [];
   console.error = (line: unknown) => { logged.push(String(line)); };
   console.warn = (line: unknown) => { logged.push(String(line)); };
+  console.info = (line: unknown) => { infoLogged.push(String(line)); };
   __setSentryForTests({
     captureException: (value, ctx) => { captured.push({ kind: 'exception', value, ctx: ctx as Record<string, unknown> }); },
     captureMessage: (value, ctx) => { captured.push({ kind: 'message', value, ctx: ctx as Record<string, unknown> }); },
@@ -21,6 +25,7 @@ beforeEach(() => {
 afterEach(() => {
   console.error = origError;
   console.warn = origWarn;
+  console.info = origInfo;
   __resetSentryForTests();
 });
 
@@ -80,5 +85,23 @@ describe('reportSignal', () => {
     const ctx = captured[0].ctx as { level: string; tags: Record<string, string> };
     expect(ctx.level).toBe('warning');
     expect(ctx.tags.tag).toBe('recap-fallback');
+  });
+});
+
+describe('logInfo', () => {
+  it('emits a console.info line and does NOT capture to Sentry', () => {
+    logInfo('recap-fallback', { reason: 'thin-transcript' });
+
+    // Nothing should have gone to error/warn logs or to Sentry.
+    expect(logged).toHaveLength(0);
+    expect(captured).toHaveLength(0);
+
+    // One info line, parseable with correct fields.
+    expect(infoLogged).toHaveLength(1);
+    const line = JSON.parse(infoLogged[0]);
+    expect(line.level).toBe('info');
+    expect(line.msg).toBe('recap-fallback');
+    expect(line.reason).toBe('thin-transcript');
+    expect(typeof line.ts).toBe('string');
   });
 });

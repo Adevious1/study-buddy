@@ -121,6 +121,7 @@ describe('generateRecap', () => {
     const result = await generateRecap(input, hang, 50);
     expect(result.source).toBe('fallback');
     expect(result.reason).toBe('timeout');
+    expect(result.content).toEqual(fallbackRecap());
   });
 });
 

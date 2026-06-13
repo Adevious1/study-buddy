@@ -22,18 +22,22 @@ export function __resetSentryForTests(): void {
   };
 }
 
-function logLine(level: ReportLevel, msg: string, fields: Record<string, unknown>): void {
+type LogLevel = ReportLevel | 'info';
+
+function logLine(level: LogLevel, msg: string, fields: Record<string, unknown>): void {
   // Envelope keys (ts/level/msg) are written last so a ctx key can never clobber them.
   // Log line uses 'warn' (matching the request logger); Sentry ctx keeps 'warning' (SeverityLevel).
-  const payload = { ...fields, ts: new Date().toISOString(), level: level === 'warning' ? 'warn' : 'error', msg };
+  const lineLevel = level === 'warning' ? 'warn' : level;
+  const payload = { ...fields, ts: new Date().toISOString(), level: lineLevel, msg };
   let line: string;
   try {
     line = JSON.stringify(payload);
   } catch {
     // Circular ctx must never take down an error path (onError, process handlers).
-    line = JSON.stringify({ ts: payload.ts, level: payload.level, msg, ctxError: 'unserializable-context' });
+    line = JSON.stringify({ ts: payload.ts, level: lineLevel, msg, ctxError: 'unserializable-context' });
   }
   if (level === 'error') console.error(line);
+  else if (level === 'info') console.info(line);
   else console.warn(line);
 }
 
@@ -64,4 +68,13 @@ export function reportSignal(
 ): void {
   logLine(level, tag, ctx);
   sentry.captureMessage(tag, captureCtx(tag, ctx, level));
+}
+
+/**
+ * Structured info log line only — no Sentry capture. For expected/designed
+ * outcomes worth seeing in logs but not worth a Sentry issue.
+ */
+export function logInfo(tag: string, ctx: Record<string, unknown> = {}): void {
+  // Reuse the envelope-last/circular-safe construction.
+  logLine('info', tag, ctx);
 }
