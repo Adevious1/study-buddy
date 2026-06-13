@@ -43,7 +43,7 @@ api.route('/children', snapshotsRoute);
 app.route('/api', api);
 
 app.onError((err, c) => {
-  reportError('http', err, { path: c.req.path, method: c.req.method });
+  reportError('http', err, { path: c.req.path, method: c.req.method, status: 500 });
   return c.json({ error: { code: 'internal', message: 'Unexpected error' } }, 500);
 });
 

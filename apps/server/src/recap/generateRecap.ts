@@ -129,9 +129,12 @@ export function makeRecapGeneratorFromModelCall(
         return await call(plan[i], instruction, transcriptScript);
       } catch (err) {
         lastErr = err;
-        console.warn(
-          `[recap] model ${plan[i]} (attempt ${i + 1}/${plan.length}) failed: ${(err as Error)?.message ?? String(err)}`,
-        );
+        // Per-attempt failures are expected (the plan retries + falls over);
+        // only terminal failure signals Sentry via the recap-fallback path.
+        logInfo('recap-model-attempt-failed', {
+          attempt: i + 1,
+          reason: (err as Error)?.message ?? String(err),
+        });
       }
     }
     throw lastErr;
