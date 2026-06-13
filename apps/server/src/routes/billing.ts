@@ -33,7 +33,7 @@ billingRoute.post('/checkout', async (c) => {
     });
     return c.json({ url });
   } catch (err) {
-    reportError('billing-checkout', err);
+    reportError('billing-checkout', err, { guardianId: g.id });
     return c.json({ error: { code: 'checkout_failed', message: 'Could not start checkout' } }, 502);
   }
 });
@@ -45,7 +45,7 @@ billingRoute.post('/portal', async (c) => {
     const url = await createPortalSession(customerId);
     return c.json({ url });
   } catch (err) {
-    reportError('billing-portal', err);
+    reportError('billing-portal', err, { guardianId: g.id });
     return c.json({ error: { code: 'portal_failed', message: 'Could not open billing portal' } }, 502);
   }
 });

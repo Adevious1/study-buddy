@@ -4,12 +4,12 @@ import { scrubEvent, scrubContext, type ScrubbableEvent } from './scrub';
 describe('scrubContext', () => {
   it('keeps allowlisted keys and drops everything else', () => {
     const out = scrubContext({
-      childId: 'c-1', sessionId: 's-1', guardianId: 'g-1',
+      childId: 'c-1', sessionId: 's-1', guardianId: 'g-1', userId: 'u-1',
       transcript: [{ role: 'child', text: 'my name is Maya' }],
       childName: 'Maya', email: 'parent@x.com',
       durationMs: 1234, reason: 'timeout',
     });
-    expect(out).toEqual({ childId: 'c-1', sessionId: 's-1', guardianId: 'g-1', durationMs: 1234, reason: 'timeout' });
+    expect(out).toEqual({ childId: 'c-1', sessionId: 's-1', guardianId: 'g-1', userId: 'u-1', durationMs: 1234, reason: 'timeout' });
   });
 
   it('returns an empty object for undefined input', () => {

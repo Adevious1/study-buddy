@@ -8,6 +8,8 @@ export const healthRoute = new Hono().get('/healthz', async (c) => {
     await db.execute(drizzleSql`SELECT 1`);
     return c.json({ ok: true, db: 'up' as const });
   } catch (err) {
+    // Conscious choice: every failed probe captures to Sentry. Fine at this
+    // product's probe frequency; sample or first-failure-only if probes speed up.
     reportError('healthz-db', err);
     return c.json({ ok: false, db: 'down' as const }, 503);
   }

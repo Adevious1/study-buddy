@@ -12,7 +12,7 @@
  * product.
  */
 const ALLOWED_CONTEXT_KEYS = new Set([
-  'tag', 'childId', 'sessionId', 'guardianId', 'stripeCustomerId',
+  'tag', 'childId', 'sessionId', 'guardianId', 'userId', 'stripeCustomerId',
   'path', 'method', 'status', 'durationMs', 'attempt', 'reason',
   'state', 'turns', 'days', 'code',
 ]);
