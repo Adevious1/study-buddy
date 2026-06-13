@@ -48,8 +48,24 @@ describe('reportError', () => {
 
   it('supports warning level', () => {
     reportError('seat-sync', new Error('x'), {}, 'warning');
-    expect(JSON.parse(logged[0]).level).toBe('warning');
+    // Log line uses 'warn'; Sentry ctx keeps 'warning' (SeverityLevel).
+    expect(JSON.parse(logged[0]).level).toBe('warn');
     expect((captured[0].ctx as { level: string }).level).toBe('warning');
+  });
+
+  it('handles a non-Error thrown value', () => {
+    reportError('http', 'plain string failure');
+    const line = JSON.parse(logged[0]);
+    expect(line.error).toBe('plain string failure');
+    expect(line.stack).toBeUndefined();
+    expect(captured[0].value).toBe('plain string failure');
+  });
+
+  it('never throws on unserializable context', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(() => reportError('http', new Error('x'), circular)).not.toThrow();
+    expect(JSON.parse(logged[0]).ctxError).toBe('unserializable-context');
   });
 });
 

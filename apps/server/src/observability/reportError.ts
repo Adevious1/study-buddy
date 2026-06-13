@@ -23,7 +23,16 @@ export function __resetSentryForTests(): void {
 }
 
 function logLine(level: ReportLevel, msg: string, fields: Record<string, unknown>): void {
-  const line = JSON.stringify({ ts: new Date().toISOString(), level, msg, ...fields });
+  // Envelope keys (ts/level/msg) are written last so a ctx key can never clobber them.
+  // Log line uses 'warn' (matching the request logger); Sentry ctx keeps 'warning' (SeverityLevel).
+  const payload = { ...fields, ts: new Date().toISOString(), level: level === 'warning' ? 'warn' : 'error', msg };
+  let line: string;
+  try {
+    line = JSON.stringify(payload);
+  } catch {
+    // Circular ctx must never take down an error path (onError, process handlers).
+    line = JSON.stringify({ ts: payload.ts, level: payload.level, msg, ctxError: 'unserializable-context' });
+  }
   if (level === 'error') console.error(line);
   else console.warn(line);
 }
@@ -43,7 +52,7 @@ export function reportError(
 ): void {
   const message = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack : undefined;
-  logLine(level, tag, { error: message, ...(stack ? { stack } : {}), ...ctx });
+  logLine(level, tag, { ...ctx, error: message, ...(stack ? { stack } : {}) });
   sentry.captureException(err, captureCtx(tag, ctx, level));
 }
 
