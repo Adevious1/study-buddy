@@ -14,6 +14,8 @@ import { auth } from './lib/auth';
 import { meRoute } from './routes/me';
 import { billingRoute } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripeWebhook';
+import { initSentry, installProcessHandlers } from './observability/sentry';
+import { reportError } from './observability/reportError';
 
 export const app = new Hono();
 app.use('*', requestLogger);
@@ -39,12 +41,14 @@ api.route('/children', snapshotsRoute);
 app.route('/api', api);
 
 app.onError((err, c) => {
-  console.error('[onError]', err);
+  reportError('http', err, { path: c.req.path, method: c.req.method });
   return c.json({ error: { code: 'internal', message: 'Unexpected error' } }, 500);
 });
 
 const port = Number(process.env.PORT ?? 3001);
 if (import.meta.main) {
+  initSentry();
+  installProcessHandlers();
   console.log(`[server] listening on :${port}`);
   Bun.serve({ port, fetch: app.fetch, websocket: voiceWebsocket });
 }
