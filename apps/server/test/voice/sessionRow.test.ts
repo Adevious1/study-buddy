@@ -71,4 +71,20 @@ describe('sessionRow', () => {
     expect(row.transcript).toEqual([{ role: 'child', text: 'bye' }]);
     expect(row.starsEarned).toBeNull();
   });
+
+  it('persists recapSource and reconnectCount when finalizing', async () => {
+    const id = await mod.createLiveSession(VOICE_TEST_CHILD_ID, 'math', 'Fractions');
+    await mod.finalizeLiveSession(id, 'completed', { recapSource: 'fallback', reconnectCount: 2 });
+    const row = await mod.getSessionById(id);
+    expect(row.recapSource).toBe('fallback');
+    expect(row.reconnectCount).toBe(2);
+  });
+
+  it('defaults reconnectCount to 0 and recapSource to null', async () => {
+    const id = await mod.createLiveSession(VOICE_TEST_CHILD_ID, 'math', 'Counting');
+    await mod.finalizeLiveSession(id, 'abandoned');
+    const row = await mod.getSessionById(id);
+    expect(row.recapSource).toBeNull();
+    expect(row.reconnectCount).toBe(0);
+  });
 });

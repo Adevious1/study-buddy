@@ -35,6 +35,8 @@ export async function createLiveSession(
 export interface FinalizeExtra {
   transcript?: TranscriptTurn[];
   recap?: RecapContent;
+  recapSource?: 'model' | 'fallback';
+  reconnectCount?: number;
 }
 
 /** Mark a live session completed/abandoned, stamp endedAt, and persist transcript + recap. */
@@ -61,6 +63,8 @@ export async function finalizeLiveSession(
             insightBadge: extra.recap.insightBadge,
           }
         : {}),
+      ...(extra.recapSource ? { recapSource: extra.recapSource } : {}),
+      ...(extra.reconnectCount !== undefined ? { reconnectCount: extra.reconnectCount } : {}),
     })
     .where(eq(sessions.id, id));
 }
