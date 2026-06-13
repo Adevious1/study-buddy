@@ -29,6 +29,12 @@ describe('GET /api/ops/metrics', () => {
     expect(res.status).toBe(404);
   });
 
+  it('401s when the Authorization header is absent', async () => {
+    process.env.OPS_METRICS_TOKEN = TOKEN;
+    const res = await app.request('/api/ops/metrics');
+    expect(res.status).toBe(401);
+  });
+
   it('401s on a wrong token', async () => {
     process.env.OPS_METRICS_TOKEN = TOKEN;
     const res = await app.request('/api/ops/metrics', { headers: { Authorization: 'Bearer nope' } });
@@ -56,6 +62,9 @@ describe('GET /api/ops/metrics', () => {
     expect(body.recaps.fallback).toBeGreaterThanOrEqual(1);
     expect(body.reconnects.total).toBeGreaterThanOrEqual(1);
     expect(body.reconnects.sessionsWith).toBeGreaterThanOrEqual(1);
+    // avgDurationSeconds is completed-sessions-only; seeded sessions start/end instantly so
+    // the value may be 0 or null — just assert it's not an abandoned-session-skewed non-number.
+    expect(body.avgDurationSeconds === null || typeof body.avgDurationSeconds === 'number').toBe(true);
     expect(Array.isArray(body.perDay)).toBe(true);
     expect(body.perDay.length).toBeGreaterThanOrEqual(1);
     // No PII anywhere in the response.

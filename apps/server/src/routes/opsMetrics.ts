@@ -44,16 +44,19 @@ export const opsMetricsRoute = new Hono().get('/metrics', async (c) => {
       count(*) FILTER (WHERE recap_source = 'fallback')::int       AS recap_fallback,
       coalesce(sum(reconnect_count), 0)::int                       AS reconnects_total,
       count(*) FILTER (WHERE reconnect_count > 0)::int             AS sessions_with_reconnect,
+      -- avgDurationSeconds is completed-sessions-only; abandoned sessions have near-zero durations that would skew the average.
       round(avg(extract(epoch FROM (ended_at - started_at)))
-            FILTER (WHERE ended_at IS NOT NULL))::int              AS avg_duration_s
+            FILTER (WHERE state = 'completed' AND ended_at IS NOT NULL))::int AS avg_duration_s
     FROM sessions
     WHERE started_at >= now() - make_interval(days => ${days})
   `);
+  // Seq-scans sessions (no started_at index) — fine at current scale; add sessions(started_at) if it grows.
   const agg = aggResult[0] as unknown as AggRow;
 
   const perDayResult = await db.execute(sql`
     SELECT
-      to_char(date_trunc('day', started_at), 'YYYY-MM-DD')         AS day,
+      -- Day buckets are UTC regardless of connection TZ.
+      to_char(date_trunc('day', started_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
       count(*) FILTER (WHERE state = 'completed')::int             AS completed,
       count(*) FILTER (WHERE state = 'abandoned')::int             AS abandoned
     FROM sessions
@@ -73,7 +76,7 @@ export const opsMetricsRoute = new Hono().get('/metrics', async (c) => {
     },
     recaps: { model: agg.recap_model, fallback: agg.recap_fallback },
     reconnects: { total: agg.reconnects_total, sessionsWith: agg.sessions_with_reconnect },
-    avgDurationSeconds: agg.avg_duration_s,
+    avgDurationSeconds: agg.avg_duration_s, // completed sessions only
     perDay,
   });
 });
