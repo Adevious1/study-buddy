@@ -29,4 +29,28 @@ describe('process handlers', () => {
     expect(calls).toEqual(['report', 'flush', 'exit']);
     expect(exitCode).toBe(1);
   });
+
+  it('exception handler exits even when flush rejects', async () => {
+    let exitCode: number | undefined;
+    const handler = makeExceptionHandler({
+      report: () => {},
+      flush: async () => { throw new Error('network gone'); },
+      exit: (code: number) => { exitCode = code; },
+    });
+    handler(new Error('crash'));
+    await Bun.sleep(10);
+    expect(exitCode).toBe(1);
+  });
+
+  it('exception handler still exits when report itself throws', async () => {
+    let exitCode: number | undefined;
+    const handler = makeExceptionHandler({
+      report: () => { throw new Error('console is broken'); },
+      flush: async () => true,
+      exit: (code: number) => { exitCode = code; },
+    });
+    handler(new Error('crash'));
+    await Bun.sleep(10);
+    expect(exitCode).toBe(1);
+  });
 });

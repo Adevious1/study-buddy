@@ -17,6 +17,8 @@ export function initSentry(): boolean {
     tracesSampleRate: 0, // errors + signals only; no performance tracing
     // We register our own process handlers below (deterministic + testable);
     // drop the SDK's so an uncaught error is never double-captured.
+    // Console integration stays enabled (breadcrumb trail), but breadcrumbs are
+    // dropped wholesale by scrubEvent in beforeSend, so console lines never leave the box.
     integrations: (defaults) =>
       defaults.filter((i) => i.name !== 'OnUncaughtException' && i.name !== 'OnUnhandledRejection'),
     // ErrorEvent.tags is { [k: string]: Primitive } while ScrubbableEvent.tags
@@ -50,7 +52,9 @@ export function makeRejectionHandler(deps: HandlerDeps = defaultDeps) {
 /** Conventional crash semantics: capture, flush, exit(1); Docker restarts the container. */
 export function makeExceptionHandler(deps: HandlerDeps = defaultDeps) {
   return (err: unknown): void => {
-    deps.report('uncaught-exception', err);
+    // The process is already in an unknown state — the exit guarantee matters
+    // more than a clean report.
+    try { deps.report('uncaught-exception', err); } catch { /* best-effort */ }
     void deps.flush(2000).catch(() => false).finally(() => deps.exit(1));
   };
 }

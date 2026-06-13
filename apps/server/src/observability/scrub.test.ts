@@ -53,4 +53,14 @@ describe('scrubEvent', () => {
     const event = scrubEvent(input);
     expect(event.message).toBe('boom');
   });
+
+  it('drops breadcrumbs wholesale', () => {
+    const input: ScrubbableEvent = {
+      breadcrumbs: [{ category: 'console', message: '{"error":"Maya said something"}' }],
+      message: 'boom',
+    };
+    const event = scrubEvent(input);
+    expect(event.breadcrumbs).toBeUndefined();
+    expect(event.message).toBe('boom');
+  });
 });

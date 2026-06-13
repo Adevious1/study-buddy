@@ -5,6 +5,11 @@
  * IDs are pseudonymous UUIDs, safe for cross-event correlation.
  * String-valued allowlist keys (`reason`, `state`, `code`) must carry short,
  * controlled values (enums, status codes) — never free text from user input.
+ *
+ * Breadcrumbs are dropped wholesale: Sentry's Console integration attaches raw
+ * structured log lines (error text, stacks, non-allowlisted ctx) as breadcrumbs
+ * that the field-by-field allowlist cannot vet — not appropriate for a kids'
+ * product.
  */
 const ALLOWED_CONTEXT_KEYS = new Set([
   'tag', 'childId', 'sessionId', 'guardianId', 'stripeCustomerId',
@@ -23,6 +28,7 @@ export interface ScrubbableEvent {
   user?: { id?: string | number; [k: string]: unknown };
   extra?: Record<string, unknown>;
   tags?: Record<string, unknown>;
+  breadcrumbs?: unknown;
   [k: string]: unknown;
 }
 
@@ -39,5 +45,8 @@ export function scrubEvent<E extends ScrubbableEvent>(event: E): E {
   }
   if (e.extra) e.extra = scrubContext(e.extra);
   if (e.tags) e.tags = scrubContext(e.tags);
+  // Breadcrumbs carry raw console lines (incl. error text & stacks) that the
+  // allowlist can't vet field-by-field — drop them wholesale (kids' product).
+  delete e.breadcrumbs;
   return event;
 }
