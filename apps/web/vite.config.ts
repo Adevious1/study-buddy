@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 /**
  * In Docker the monorepo is mounted at `/app`, so the client routes `/app` and
@@ -53,7 +54,25 @@ function tunnelBasicAuth(): Plugin {
 
 export default defineConfig({
   // tunnelBasicAuth first so its middleware gates everything that follows.
-  plugins: [tunnelBasicAuth(), spaAppRouteFallback(), react(), tailwindcss()],
+  plugins: [
+    tunnelBasicAuth(),
+    spaAppRouteFallback(),
+    react(),
+    tailwindcss(),
+    // Source-map upload, active only when a build-time auth token is present
+    // (i.e. the future prod pipeline). Dev/CI builds skip it entirely.
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [sentryVitePlugin({
+          org: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT,
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+        })]
+      : []),
+  ],
+  build: {
+    sourcemap: process.env.SENTRY_AUTH_TOKEN ? ('hidden' as const) : false,
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
