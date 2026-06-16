@@ -10,15 +10,16 @@ The design spec lives in `docs/superpowers/specs/`.
 
 ## Status
 
-**All ten subsystems — SP1 (UI), SP2 (backend + database), SP3 (live voice
-tutor), SP4 (auth), SP5 (billing), SP6 (session recap), SP7 (camera vision /
-"Show Pip"), SP8 (reconnect / longer sessions), SP9 (account lifecycle &
-compliance), and SP10 (observability) — are implemented**; SP1–SP9 are
-smoke-verified (SP7 + SP8 via a human mic run and SP9 via a browser run, all
-on 2026-06-12; the only tabled checks are SP5/SP9's live-Stripe click-throughs
-and SP8's auto-cap firing, each unit-covered); SP10's smoke is ⬜ pending
-(needs Sentry DSNs — see `SP10-manual-smoke.md`). All ten are merged to `main`;
-the feature branches are deleted.
+**All ten product subsystems plus a hardening batch (SP11) — SP1 (UI), SP2
+(backend + database), SP3 (live voice tutor), SP4 (auth), SP5 (billing), SP6
+(session recap), SP7 (camera vision / "Show Pip"), SP8 (reconnect / longer
+sessions), SP9 (account lifecycle & compliance), SP10 (observability), and SP11
+(production hardening) — are implemented**; SP1–SP9 are smoke-verified (SP7 +
+SP8 via a human mic run and SP9 via a browser run, all on 2026-06-12; the only
+tabled checks are SP5/SP9's live-Stripe click-throughs and SP8's auto-cap
+firing, each unit-covered); SP10's smoke is ⬜ pending (needs Sentry DSNs — see
+`SP10-manual-smoke.md`); SP11's smoke is ⬜ pending (see `SP11-manual-smoke.md`).
+All ten are merged to `main`; the feature branches are deleted.
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
@@ -104,6 +105,37 @@ is env-gated: no DSN → Sentry is a no-op; no token → `/api/ops/metrics` retu
 404. Key files: `apps/server/src/observability/`, `apps/server/src/routes/opsMetrics.ts`,
 `apps/web/src/observability/`, `apps/web/src/components/CrashScreen.tsx`. Smoke:
 `SP10-manual-smoke.md` ⬜ pending (needs Sentry DSNs).
+
+SP11 (production hardening): a **hardening batch** — not a new product subsystem
+— that closes the main operational risks surfaced in the gap audit. Stripe webhook
+event-id dedup via a `processed_stripe_events` table (idempotent upsert; second
+delivery of the same event-id is a no-op) plus `subscriptions.last_stripe_event_at`
+event-time ordering (strict `<` guard before any state transition; closes the
+wrongful-lockout risk from out-of-order Stripe redeliveries). Graceful
+SIGTERM/SIGINT drain: a relay registry (`voice/relayRegistry.ts`) tracks every
+live `VoiceRelay` instance; on shutdown the server flips a `draining` flag (new
+requests → `503`, new voice WS → immediate `server-draining` error frame), then
+waits for all live relays to finish their fallback recap, bounded by
+`SHUTDOWN_DRAIN_MS` (env var, default 25 s, wired into `docker-compose.yml`).
+The relay was already capable of fallback-recap-on-session-end; the drain harness
+just triggers `finish()` on each live relay and awaits completion — so the
+container exits on budget, sessions get a recap row, and no child sees a frozen
+socket. Targeted rate limiting (`lib/rateLimit.ts`, guardian-keyed sliding window):
+`POST /api/me/pin/verify` 30 req/min, `POST /api/me/children` + billing routes
+10 req/min; live voice sessions are never rate-limited; a 64 KB body cap (`bodyLimit`)
+on all API routes returns `413` before handlers run. Both rate limiter and PIN
+lockout (`lib/pinLockout.ts`, moved off the old module-scope Map) run over a
+swappable `lib/ephemeralStore.ts` seam — a typed async interface (`get`/`set`/`delete`)
+backed by an in-process Map today, making a Postgres backing a true drop-in for
+multi-instance deployments. better-auth's built-in sign-in rate limiter is
+enabled in prod (`NODE_ENV === 'production'`). Miscellaneous nits closed: relay
+`send()` wrapped in try-catch + `reportError` (was silent on a closed WS);
+`geminiSession.close()` is now awaited; an explicit reconnect-in-progress guard
+prevents concurrent reconnect races; `subscriptions.stripe_customer_id` gets an
+index (migration 0007); Zod 400 responses no longer leak `.issues` in
+production. Migration 0007. Smoke `SP11-manual-smoke.md` ⬜ pending. Key files:
+`apps/server/src/lib/ephemeralStore.ts`, `lib/rateLimit.ts`,
+`voice/relayRegistry.ts`, `routes/stripeWebhook.ts`, `lib/entitlement.ts`.
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -221,6 +253,9 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
 - `SP10-manual-smoke.md` (observability) — ⬜ **not yet run** (needs a free-tier
   Sentry account with two projects, their DSNs in `.env`, and
   `OPS_METRICS_TOKEN=<random>` — see the checklist in the doc).
+- `SP11-manual-smoke.md` (production hardening) — ⬜ **not yet run** (most checks
+  need only the dev stack; the webhook ordering check pairs with the still-tabled
+  SP5 live-Stripe smoke — see the checklist in the doc).
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
