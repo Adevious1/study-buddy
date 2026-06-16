@@ -5,6 +5,7 @@ import { subscriptions } from '../db/schema';
 import { guardianContext, type GuardianVariables } from '../lib/guardianContext';
 import { getEntitlement, getOrCreateCustomer, childCount } from '../lib/billing';
 import { createCheckoutSession, createPortalSession } from '../lib/stripe';
+import { reportError } from '../observability/reportError';
 
 export const billingRoute = new Hono<{ Variables: GuardianVariables }>();
 billingRoute.use('*', guardianContext);
@@ -32,7 +33,7 @@ billingRoute.post('/checkout', async (c) => {
     });
     return c.json({ url });
   } catch (err) {
-    console.error('[billing] checkout failed', err);
+    reportError('billing-checkout', err, { guardianId: g.id });
     return c.json({ error: { code: 'checkout_failed', message: 'Could not start checkout' } }, 502);
   }
 });
@@ -44,7 +45,7 @@ billingRoute.post('/portal', async (c) => {
     const url = await createPortalSession(customerId);
     return c.json({ url });
   } catch (err) {
-    console.error('[billing] portal failed', err);
+    reportError('billing-portal', err, { guardianId: g.id });
     return c.json({ error: { code: 'portal_failed', message: 'Could not open billing portal' } }, 502);
   }
 });

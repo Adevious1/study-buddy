@@ -4,6 +4,7 @@ import { db } from '../db/client';
 import { subscriptions } from '../db/schema';
 import { constructWebhookEvent } from '../lib/stripe';
 import { applyStripeEvent, type SubRow, type StripeEventLike } from '../lib/entitlement';
+import { reportSignal } from '../observability/reportError';
 
 export const stripeWebhookRoute = new Hono();
 
@@ -23,7 +24,7 @@ stripeWebhookRoute.post('/', async (c) => {
 
   const [row] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, customerId)).limit(1);
   if (!row) {
-    console.warn('[webhook] no subscription row for customer', customerId);
+    reportSignal('webhook-no-subscription-row', { stripeCustomerId: customerId });
     return c.body(null, 200); // ack; nothing to update
   }
 

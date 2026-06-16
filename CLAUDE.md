@@ -10,13 +10,15 @@ The design spec lives in `docs/superpowers/specs/`.
 
 ## Status
 
-**All nine subsystems — SP1 (UI), SP2 (backend + database), SP3 (live voice
+**All ten subsystems — SP1 (UI), SP2 (backend + database), SP3 (live voice
 tutor), SP4 (auth), SP5 (billing), SP6 (session recap), SP7 (camera vision /
-"Show Pip"), SP8 (reconnect / longer sessions), and SP9 (account lifecycle &
-compliance) — are done and smoke-verified** (SP7 + SP8 via a human mic run and
-SP9 via a browser run, all on 2026-06-12; the only tabled checks are SP5/SP9's
-live-Stripe click-throughs and SP8's auto-cap firing, each unit-covered). All
-nine are merged to `main`; the feature branches are deleted.
+"Show Pip"), SP8 (reconnect / longer sessions), SP9 (account lifecycle &
+compliance), and SP10 (observability) — are implemented**; SP1–SP9 are
+smoke-verified (SP7 + SP8 via a human mic run and SP9 via a browser run, all
+on 2026-06-12; the only tabled checks are SP5/SP9's live-Stripe click-throughs
+and SP8's auto-cap firing, each unit-covered); SP10's smoke is ⬜ pending
+(needs Sentry DSNs — see `SP10-manual-smoke.md`). All ten are merged to `main`;
+the feature branches are deleted.
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
@@ -75,6 +77,33 @@ files: `apps/server/src/routes/me.ts`,
 `apps/web/src/routes/auth/PinResetRoute.tsx` / `GoodbyeRoute.tsx`, and the
 legal routes. Browser smoke ✅ verified 2026-06-12 (`SP9-manual-smoke.md`;
 live-Stripe cancel check tabled).
+
+SP10 (observability): Sentry SaaS wired into both the server (`@sentry/bun`) and
+the web client (`@sentry/react`). An allowlist scrubber enforces zero-PII capture
+server-side — no request body, no cookies/headers, no names or emails reach
+Sentry, breadcrumbs are dropped wholesale server-side, and console breadcrumbs +
+Session Replay are explicitly off in the web SDK. Errors are reported through a
+single `reportError`/`reportSignal`/`logInfo` convention
+(`apps/server/src/observability/`, `apps/web/src/observability/`) that replaced
+scattered `console.error` sites. Process-level handlers catch unhandledRejection
+(capture-and-continue, process stays up) and uncaughtException (capture → flush →
+exit); graceful-shutdown logic is deferred to the hardening batch. Two new
+`sessions` columns — `recap_source` (`model` | `fallback`) and
+`reconnect_count` — are populated by the relay/recap pipeline (migration 0006);
+expected no-op fallbacks thin-transcript and no-generator are log-only (info);
+degradation reasons timeout/invalid-output/generation-failed emit a Sentry
+warning and set `recap_source = 'fallback'`; `reconnect-exhausted` emits a
+Sentry error. A token-guarded fail-closed `GET /api/ops/metrics` endpoint
+(constant-time bearer check; 404 when `OPS_METRICS_TOKEN` is unset; counts only;
+completed-sessions-only avg duration; UTC day buckets) surfaces aggregate
+health without exposing user data. The web app wraps the router in a
+kid-friendly `CrashScreen` error boundary (Pip face, "Something went wonky!",
+Start over button) so any unhandled React crash is caught gracefully. Source
+maps upload to Sentry at build time when `SENTRY_AUTH_TOKEN` is set. Everything
+is env-gated: no DSN → Sentry is a no-op; no token → `/api/ops/metrics` returns
+404. Key files: `apps/server/src/observability/`, `apps/server/src/routes/opsMetrics.ts`,
+`apps/web/src/observability/`, `apps/web/src/components/CrashScreen.tsx`. Smoke:
+`SP10-manual-smoke.md` ⬜ pending (needs Sentry DSNs).
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -189,6 +218,9 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
   live-Stripe cancel check is tabled (needs test creds, like SP5). Run surfaced an
   ops step: **after merging a migration, run `db:migrate` against the dev stack**
   (`docker exec study-buddy-server-1 sh -c 'cd /app/apps/server && bun run db:migrate'`).
+- `SP10-manual-smoke.md` (observability) — ⬜ **not yet run** (needs a free-tier
+  Sentry account with two projects, their DSNs in `.env`, and
+  `OPS_METRICS_TOKEN=<random>` — see the checklist in the doc).
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
@@ -271,6 +303,19 @@ implementation cycle. **Do not collapse these into one effort.**
    consent checkbox stamping `children.consent_at`; public `/privacy` + `/terms`
    with login consent line. Browser smoke ✅ verified 2026-06-12
    (`SP9-manual-smoke.md`; live-Stripe cancel check tabled).
+10. **Observability** ✓ _implemented_ — Sentry SaaS on server (`@sentry/bun`) +
+    web (`@sentry/react`) with an allowlist PII scrubber (zero PII, pseudonymous
+    IDs only, breadcrumbs dropped wholesale server-side, console breadcrumbs + Session
+    Replay off on the web); `reportError`/`reportSignal`/`logInfo` convention
+    replacing scattered console.error sites; process-level unhandledRejection
+    (capture-and-continue) + uncaughtException (capture-flush-exit) handlers;
+    `sessions.recap_source` + `sessions.reconnect_count` columns (migration 0006)
+    populated by relay/recap pipeline — degradation fallbacks signal Sentry, expected
+    no-ops are log-only; token-guarded fail-closed `GET /api/ops/metrics` (404 when
+    env-unset, constant-time bearer check, completed-only avg duration, UTC day
+    buckets); kid-friendly `CrashScreen` error boundary; conditional source-map
+    upload. All env-gated: no DSN → no-op; no token → 404. Smoke: ⬜ pending
+    (`SP10-manual-smoke.md`; needs a free-tier Sentry account + DSNs).
 
 ## Planned layout (pnpm monorepo)
 

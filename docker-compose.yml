@@ -39,6 +39,9 @@ services:
       STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
       BILLING_TRIAL_DAYS: ${BILLING_TRIAL_DAYS:-14}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:5173}
+      # Observability (SP10) — optional; unset = disabled
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      OPS_METRICS_TOKEN: ${OPS_METRICS_TOKEN:-}
     volumes:
       - ./apps/server:/app/apps/server
       - ./packages/shared:/app/packages/shared
@@ -71,6 +74,8 @@ services:
       # Optional edge Basic Auth gate for tunnel/family testing ("user:pass").
       # Unset in normal local dev — the gate is a no-op then.
       TUNNEL_BASIC_AUTH: ${TUNNEL_BASIC_AUTH:-}
+      # Observability (SP10) — optional; unset = web Sentry disabled
+      VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     volumes:
       - ./apps/web:/app/apps/web
       - ./packages/shared:/app/packages/shared

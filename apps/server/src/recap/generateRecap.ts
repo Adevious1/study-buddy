@@ -5,6 +5,7 @@ import {
   parseRecapContent, fallbackRecap, transcriptToScript,
   RECAP_RESPONSE_SCHEMA, type RecapContent,
 } from './recapContent';
+import { reportSignal, logInfo } from '../observability/reportError';
 
 // ─── Recap models — update these as Gemini ships newer models ──────────────────
 /** Primary non-streaming model for the post-session recap summary. */
@@ -53,6 +54,15 @@ export type RecapGenerator = (instruction: string, transcriptScript: string) => 
 /** A single model call (one model, one attempt). May throw / time out. */
 export type ModelCall = (model: string, instruction: string, transcriptScript: string) => Promise<unknown>;
 
+export type RecapFallbackReason =
+  | 'thin-transcript' | 'no-generator' | 'invalid-output' | 'timeout' | 'generation-failed';
+
+export interface RecapResult {
+  content: RecapContent;
+  source: 'model' | 'fallback';
+  reason?: RecapFallbackReason;
+}
+
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('recap-timeout')), ms);
@@ -62,21 +72,29 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+/** Designed exit paths — countable in ops metrics via recap_source, but not Sentry-worthy. */
+const EXPECTED_FALLBACK_REASONS: ReadonlySet<RecapFallbackReason> = new Set(['thin-transcript', 'no-generator']);
+
+function fallbackResult(reason: RecapFallbackReason, extra: Record<string, unknown> = {}): RecapResult {
+  if (EXPECTED_FALLBACK_REASONS.has(reason)) logInfo('recap-fallback', { reason, ...extra });
+  else reportSignal('recap-fallback', { reason, ...extra });
+  return { content: fallbackRecap(), source: 'fallback', reason };
+}
+
 /**
- * Produce a recap from the transcript. Always resolves to a usable RecapContent:
+ * Produce a recap from the transcript. Always resolves to a usable RecapResult:
  * the model output when it is valid and timely, otherwise an encouraging fallback.
  */
 export async function generateRecap(
   input: RecapGenInput,
   generator: RecapGenerator | null,
   timeoutMs: number = RECAP_TIMEOUT_MS,
-): Promise<RecapContent> {
+): Promise<RecapResult> {
   const childSpoke = input.turns.some((t) => t.role === 'child');
   if (input.turns.length < MIN_TRANSCRIPT_TURNS || !childSpoke) {
-    console.info(`[recap] transcript too thin (${input.turns.length} turns, childSpoke=${childSpoke}); using fallback`);
-    return fallbackRecap();
+    return fallbackResult('thin-transcript', { turns: input.turns.length });
   }
-  if (!generator) return fallbackRecap();
+  if (!generator) return fallbackResult('no-generator');
   const startedAt = Date.now();
   try {
     const instruction = await buildRecapInstruction(input);
@@ -84,14 +102,14 @@ export async function generateRecap(
     const raw = await withTimeout(generator(instruction, script), timeoutMs);
     const parsed = parseRecapContent(raw);
     if (!parsed) {
-      console.warn(`[recap] model output failed validation after ${Date.now() - startedAt}ms; using fallback`);
-      return fallbackRecap();
+      return fallbackResult('invalid-output', { durationMs: Date.now() - startedAt });
     }
     console.info(`[recap] generated in ${Date.now() - startedAt}ms`);
-    return parsed;
+    return { content: parsed, source: 'model' };
   } catch (err) {
-    console.warn(`[recap] generation failed after ${Date.now() - startedAt}ms (${(err as Error)?.message ?? String(err)}); using fallback`);
-    return fallbackRecap();
+    const reason: RecapFallbackReason =
+      (err as Error)?.message === 'recap-timeout' ? 'timeout' : 'generation-failed';
+    return fallbackResult(reason, { durationMs: Date.now() - startedAt });
   }
 }
 
@@ -111,9 +129,12 @@ export function makeRecapGeneratorFromModelCall(
         return await call(plan[i], instruction, transcriptScript);
       } catch (err) {
         lastErr = err;
-        console.warn(
-          `[recap] model ${plan[i]} (attempt ${i + 1}/${plan.length}) failed: ${(err as Error)?.message ?? String(err)}`,
-        );
+        // Per-attempt failures are expected (the plan retries + falls over);
+        // only terminal failure signals Sentry via the recap-fallback path.
+        logInfo('recap-model-attempt-failed', {
+          attempt: i + 1,
+          reason: (err as Error)?.message ?? String(err),
+        });
       }
     }
     throw lastErr;

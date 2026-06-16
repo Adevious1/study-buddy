@@ -1,0 +1,107 @@
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { reportError, reportSignal, logInfo, __setSentryForTests, __resetSentryForTests } from './reportError';
+
+type Captured = { kind: 'exception' | 'message'; value: unknown; ctx: Record<string, unknown> };
+let captured: Captured[] = [];
+let logged: string[] = [];
+let infoLogged: string[] = [];
+const origError = console.error;
+const origWarn = console.warn;
+const origInfo = console.info;
+
+beforeEach(() => {
+  captured = [];
+  logged = [];
+  infoLogged = [];
+  console.error = (line: unknown) => { logged.push(String(line)); };
+  console.warn = (line: unknown) => { logged.push(String(line)); };
+  console.info = (line: unknown) => { infoLogged.push(String(line)); };
+  __setSentryForTests({
+    captureException: (value, ctx) => { captured.push({ kind: 'exception', value, ctx: ctx as Record<string, unknown> }); },
+    captureMessage: (value, ctx) => { captured.push({ kind: 'message', value, ctx: ctx as Record<string, unknown> }); },
+  });
+});
+
+afterEach(() => {
+  console.error = origError;
+  console.warn = origWarn;
+  console.info = origInfo;
+  __resetSentryForTests();
+});
+
+describe('reportError', () => {
+  it('emits a structured log line and captures the exception with tag + context', () => {
+    const err = new Error('boom');
+    reportError('snapshot-save', err, { sessionId: 's-1', childId: 'c-1' });
+
+    expect(logged).toHaveLength(1);
+    const line = JSON.parse(logged[0]);
+    expect(line.level).toBe('error');
+    expect(line.msg).toBe('snapshot-save');
+    expect(line.error).toBe('boom');
+    expect(line.sessionId).toBe('s-1');
+    expect(typeof line.ts).toBe('string');
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].kind).toBe('exception');
+    expect(captured[0].value).toBe(err);
+    const ctx = captured[0].ctx as { level: string; tags: Record<string, string>; extra: Record<string, unknown> };
+    expect(ctx.level).toBe('error');
+    expect(ctx.tags.tag).toBe('snapshot-save');
+    expect(ctx.extra.sessionId).toBe('s-1');
+  });
+
+  it('supports warning level', () => {
+    reportError('seat-sync', new Error('x'), {}, 'warning');
+    // Log line uses 'warn'; Sentry ctx keeps 'warning' (SeverityLevel).
+    expect(JSON.parse(logged[0]).level).toBe('warn');
+    expect((captured[0].ctx as { level: string }).level).toBe('warning');
+  });
+
+  it('handles a non-Error thrown value', () => {
+    reportError('http', 'plain string failure');
+    const line = JSON.parse(logged[0]);
+    expect(line.error).toBe('plain string failure');
+    expect(line.stack).toBeUndefined();
+    expect(captured[0].value).toBe('plain string failure');
+  });
+
+  it('never throws on unserializable context', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expect(() => reportError('http', new Error('x'), circular)).not.toThrow();
+    expect(JSON.parse(logged[0]).ctxError).toBe('unserializable-context');
+  });
+});
+
+describe('reportSignal', () => {
+  it('logs and captures a message with default warning level', () => {
+    reportSignal('recap-fallback', { reason: 'timeout', turns: 12 });
+    const line = JSON.parse(logged[0]);
+    expect(line.msg).toBe('recap-fallback');
+    expect(line.reason).toBe('timeout');
+    expect(captured[0].kind).toBe('message');
+    expect(captured[0].value).toBe('recap-fallback');
+    const ctx = captured[0].ctx as { level: string; tags: Record<string, string> };
+    expect(ctx.level).toBe('warning');
+    expect(ctx.tags.tag).toBe('recap-fallback');
+  });
+});
+
+describe('logInfo', () => {
+  it('emits a console.info line and does NOT capture to Sentry', () => {
+    logInfo('recap-fallback', { reason: 'thin-transcript' });
+
+    // Nothing should have gone to error/warn logs or to Sentry.
+    expect(logged).toHaveLength(0);
+    expect(captured).toHaveLength(0);
+
+    // One info line, parseable with correct fields.
+    expect(infoLogged).toHaveLength(1);
+    const line = JSON.parse(infoLogged[0]);
+    expect(line.level).toBe('info');
+    expect(line.msg).toBe('recap-fallback');
+    expect(line.reason).toBe('thin-transcript');
+    expect(typeof line.ts).toBe('string');
+  });
+});

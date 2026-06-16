@@ -161,6 +161,10 @@ export const sessions = pgTable(
     insightTitle: text('insight_title'),
     insightBody: text('insight_body'),
     insightBadge: text('insight_badge'),
+    // SP10 outcome signals: which path produced the recap, and how many
+    // transparent Gemini reconnects (SP8) the session survived.
+    recapSource: text('recap_source').$type<'model' | 'fallback'>(),
+    reconnectCount: integer('reconnect_count').notNull().default(0),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     endedAt: timestamp('ended_at', { withTimezone: true }),
     ...timestamps,
@@ -171,6 +175,7 @@ export const sessions = pgTable(
       sql`${t.subjectKind} IN ('math','reading','science','writing','spanish','social')`,
     ),
     stateCheck: check('sessions_state_check', sql`${t.state} IN ('in_progress','completed','abandoned')`),
+    recapSourceCheck: check('sessions_recap_source_check', sql`${t.recapSource} IN ('model','fallback')`),
     childStateIdx: index('sessions_child_state_idx').on(t.childId, t.state),
     childEndedDescIdx: index('sessions_child_ended_desc_idx').on(t.childId, t.endedAt.desc()),
   }),
