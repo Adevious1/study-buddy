@@ -30,6 +30,15 @@ stripeWebhookRoute.post('/', async (c) => {
     if (already.length) return c.body(null, 200);
   }
 
+  // Residual limitations (event-id dedup + strict-`<` event-time ordering close
+  // exact-redelivery and genuinely-older events): (1) two DISTINCT events racing
+  // concurrently do a read-modify-write on the subscriptions row with no
+  // FOR UPDATE row lock, so a true concurrent interleave could lose a field
+  // update — pre-existing; a transactional apply path is the follow-up.
+  // (2) Ordering is protected at one-second granularity; sub-second `created`
+  // ties resolve by arrival order. The money-critical direction is safe:
+  // `past_due` still entitles (see entitlement ENTITLED_STATUSES), so a stale
+  // event cannot lock out a paying guardian.
   const obj = (event.data.object ?? {}) as unknown as Record<string, unknown>;
   const customerId = (obj.customer as string) ?? null;
   if (!customerId) return c.body(null, 200);
@@ -59,6 +68,8 @@ stripeWebhookRoute.post('/', async (c) => {
   }
   if (event.id) {
     await db.insert(processedStripeEvents).values({ eventId: event.id }).onConflictDoNothing();
+  } else {
+    reportSignal('webhook-missing-event-id', { type: event.type });
   }
   return c.body(null, 200);
 });
