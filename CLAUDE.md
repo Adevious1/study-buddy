@@ -381,7 +381,7 @@ implementation cycle. **Do not collapse these into one effort.**
     buckets); kid-friendly `CrashScreen` error boundary; conditional source-map
     upload. All env-gated: no DSN → no-op; no token → 404. Smoke: ⬜ pending
     (`SP10-manual-smoke.md`; needs a free-tier Sentry account + DSNs).
-11. **Assignments authoring** ✓ _implemented_ — guardian CRUD for per-child
+12. **Assignments authoring** ✓ _implemented_ — guardian CRUD for per-child
     assignments on the dashboard (add/edit/delete with subject, title, date,
     duration, optional focus note); `{{focus}}` prompt token in `study-buddy.md`
     feeds Pip the guardian's note, sanitized and Socratic-rule-preserving; child
