@@ -10,16 +10,18 @@ The design spec lives in `docs/superpowers/specs/`.
 
 ## Status
 
-**All ten product subsystems plus a hardening batch (SP11) — SP1 (UI), SP2
-(backend + database), SP3 (live voice tutor), SP4 (auth), SP5 (billing), SP6
-(session recap), SP7 (camera vision / "Show Pip"), SP8 (reconnect / longer
-sessions), SP9 (account lifecycle & compliance), SP10 (observability), and SP11
-(production hardening) — are implemented**; SP1–SP9 are smoke-verified (SP7 +
-SP8 via a human mic run and SP9 via a browser run, all on 2026-06-12; the only
-tabled checks are SP5/SP9's live-Stripe click-throughs and SP8's auto-cap
-firing, each unit-covered); SP10's smoke is ⬜ pending (needs Sentry DSNs — see
-`SP10-manual-smoke.md`); SP11's smoke is ⬜ pending (see `SP11-manual-smoke.md`).
-All ten are merged to `main`; the feature branches are deleted.
+**All ten product subsystems plus a hardening batch (SP11) and assignments
+authoring (SP12) — SP1 (UI), SP2 (backend + database), SP3 (live voice tutor),
+SP4 (auth), SP5 (billing), SP6 (session recap), SP7 (camera vision / "Show
+Pip"), SP8 (reconnect / longer sessions), SP9 (account lifecycle & compliance),
+SP10 (observability), SP11 (production hardening), and SP12 (assignments
+authoring) — are implemented**; SP1–SP9 are smoke-verified (SP7 + SP8 via a
+human mic run and SP9 via a browser run, all on 2026-06-12; the only tabled
+checks are SP5/SP9's live-Stripe click-throughs and SP8's auto-cap firing, each
+unit-covered); SP10's smoke is ⬜ pending (needs Sentry DSNs — see
+`SP10-manual-smoke.md`); SP11's smoke is ⬜ pending (see `SP11-manual-smoke.md`);
+SP12's smoke is ⬜ pending (see `SP12-manual-smoke.md`). All are merged to
+`main`; the feature branches are deleted.
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
@@ -138,6 +140,29 @@ server-side via `reportError` instead). Migration 0007. Smoke
 `SP11-manual-smoke.md` ⬜ pending. Key files:
 `apps/server/src/lib/ephemeralStore.ts`, `lib/rateLimit.ts`,
 `voice/relayRegistry.ts`, `routes/stripeWebhook.ts`, `lib/entitlement.ts`.
+
+SP12 (assignments authoring): guardian-facing CRUD for per-child assignments on
+the dashboard, behind the PIN gate. Guardians can add, edit, and delete
+assignments (subject, title, scheduled date, duration, and an optional `notes`
+focus note up to 500 chars). The focus note feeds a new gated `{{focus}}` prompt
+token in `study-buddy.md` — sanitized (curly-brace stripping, whitespace
+collapse, 500-char cap) and Socratic-rule-preserving (Pip is instructed to use
+it to choose where to begin, but never to give the answer). A child tapping an
+assignment card on the home screen launches `/app/voice` with the assignment's
+subject, topic, and notes pre-filled, bypassing the subject-picker. Server-side:
+CRUD endpoints (`POST`/`GET`/`PATCH`/`DELETE`) under
+`/api/children/:childId/assignments`, protected by the existing `childContext`
+ownership authz; past-date and >120-min validation return 400; migration 0008
+adds `assignments.notes` (text, nullable) and sets `total_stars` default to 3.
+Client-side: `AssignmentForm` component; dashboard authoring section in
+`DashboardRoute.tsx` (add/edit/delete modals); `AssignmentCard` tap-to-start in
+`HomeRoute.tsx`; `getAssignments`/`createAssignment`/`updateAssignment`/`deleteAssignment`
+added to the `Repository` seam and `apiRepository`. Key files:
+`apps/server/src/routes/assignments.ts`, `apps/server/src/voice/systemPrompt.ts`
+(`{{focus}}` token), `apps/web/src/components/AssignmentForm.tsx`,
+`apps/web/src/routes/dashboard/DashboardRoute.tsx` (authoring section),
+`apps/web/src/routes/app/HomeRoute.tsx` (`AssignmentCard` onStart). Smoke:
+`SP12-manual-smoke.md` ⬜ pending.
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -258,6 +283,9 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
 - `SP11-manual-smoke.md` (production hardening) — ⬜ **not yet run** (most checks
   need only the dev stack; the webhook ordering check pairs with the still-tabled
   SP5 live-Stripe smoke — see the checklist in the doc).
+- `SP12-manual-smoke.md` (assignments authoring) — ⬜ **not yet run** (requires
+  dev stack + a real mic run for the focus-note Pip behavior check; server CRUD
+  and authz are unit-covered).
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
@@ -353,6 +381,13 @@ implementation cycle. **Do not collapse these into one effort.**
     buckets); kid-friendly `CrashScreen` error boundary; conditional source-map
     upload. All env-gated: no DSN → no-op; no token → 404. Smoke: ⬜ pending
     (`SP10-manual-smoke.md`; needs a free-tier Sentry account + DSNs).
+11. **Assignments authoring** ✓ _implemented_ — guardian CRUD for per-child
+    assignments on the dashboard (add/edit/delete with subject, title, date,
+    duration, optional focus note); `{{focus}}` prompt token in `study-buddy.md`
+    feeds Pip the guardian's note, sanitized and Socratic-rule-preserving; child
+    tap-to-start launches a voice session with the assignment's subject/topic/notes
+    pre-filled; migration 0008 (`assignments.notes` + `total_stars` default).
+    Smoke: ⬜ pending (`SP12-manual-smoke.md`).
 
 ## Planned layout (pnpm monorepo)
 
