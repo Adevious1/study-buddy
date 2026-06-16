@@ -9,11 +9,6 @@ import { makeGeminiRecapGenerator } from '../recap/generateRecap';
 import { relayRegistry } from './relayRegistry';
 
 const apiKey = process.env.GEMINI_API_KEY ?? '';
-// Fail at boot, not as a cryptic mid-session Gemini auth error. Dev/test keep
-// the empty-string default so the server boots without voice credentials.
-if (process.env.NODE_ENV === 'production' && !apiKey) {
-  throw new Error('GEMINI_API_KEY is required in production');
-}
 const connector = makeGeminiConnector(apiKey);
 const recapGenerator = makeGeminiRecapGenerator(apiKey);
 

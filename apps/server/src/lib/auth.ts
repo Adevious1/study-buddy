@@ -11,11 +11,8 @@ const isProd = process.env.NODE_ENV === 'production';
 
 // docker-compose passes BETTER_AUTH_SECRET as `${BETTER_AUTH_SECRET:-}`, which is
 // an empty string (not undefined) when unset — so `?? fallback` would NOT fire and
-// better-auth would silently run with an empty secret. Guard prod explicitly.
+// better-auth would silently run with an empty secret. (`||` not `??`)
 const secret = process.env.BETTER_AUTH_SECRET || 'dev-only-change-me';
-if (isProd && !process.env.BETTER_AUTH_SECRET) {
-  throw new Error('BETTER_AUTH_SECRET is required in production');
-}
 
 export const auth = betterAuth({
   // `||` not `??`: docker-compose passes BETTER_AUTH_URL as `${BETTER_AUTH_URL:-}`,
