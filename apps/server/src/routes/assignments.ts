@@ -17,6 +17,9 @@ const createSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
+const patchSchema = createSchema.partial();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Domain shape returned to the client. */
 function toDomain(r: typeof assignments.$inferSelect) {
   return {
@@ -89,4 +92,57 @@ assignmentsRoute.post('/:childId/assignments', async (c) => {
     })
     .returning();
   return c.json(toDomain(row), 201);
+});
+
+// PATCH update assignment.
+assignmentsRoute.patch('/:childId/assignments/:assignmentId', async (c) => {
+  const child = c.get('child');
+  const id = c.req.param('assignmentId');
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: { code: 'invalid_id', message: 'Bad assignment id' } }, 400);
+  }
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: { code: 'bad_json', message: 'Invalid JSON' } }, 400);
+  }
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) {
+    reportError('assignment-patch-validation', parsed.error, { childId: child.id }, 'warning');
+    return c.json({ error: { code: 'invalid_assignment', message: 'Invalid assignment' } }, 400);
+  }
+  if (parsed.data.scheduledDate && parsed.data.scheduledDate < todayUtc()) {
+    return c.json({ error: { code: 'invalid_assignment', message: 'scheduledDate is in the past' } }, 400);
+  }
+  const patch: Record<string, unknown> = { ...parsed.data };
+  if ('notes' in patch) {
+    patch.notes = patch.notes && String(patch.notes).length ? patch.notes : null;
+  }
+  const [row] = await db
+    .update(assignments)
+    .set(patch)
+    .where(and(eq(assignments.id, id), eq(assignments.childId, child.id)))
+    .returning();
+  if (!row) {
+    return c.json({ error: { code: 'not_found', message: 'Assignment not found' } }, 404);
+  }
+  return c.json(toDomain(row));
+});
+
+// DELETE assignment.
+assignmentsRoute.delete('/:childId/assignments/:assignmentId', async (c) => {
+  const child = c.get('child');
+  const id = c.req.param('assignmentId');
+  if (!UUID_RE.test(id)) {
+    return c.json({ error: { code: 'invalid_id', message: 'Bad assignment id' } }, 400);
+  }
+  const [row] = await db
+    .delete(assignments)
+    .where(and(eq(assignments.id, id), eq(assignments.childId, child.id)))
+    .returning();
+  if (!row) {
+    return c.json({ error: { code: 'not_found', message: 'Assignment not found' } }, 404);
+  }
+  return c.json({ ok: true });
 });
