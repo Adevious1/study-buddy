@@ -6,8 +6,20 @@ flows are NOT exercised by CI. Server-side validation and authz ARE covered by
 end-to-end browser and API flow — guardian authoring on the dashboard, child
 tap-to-start on the home screen, and Pip receiving the focus note.
 
-> **⬜ NOT YET RUN** — run this after merging SP12 and applying migration 0008
-> to the dev stack:
+> **✅ VERIFIED 2026-06-16** via Playwright against the localhost dev stack
+> (migration 0008 applied). Covered end-to-end: login + PIN gate; add assignment
+> (with focus note); edit (prefilled, note updated); empty-title → Save disabled;
+> one-tap delete (Cancel keeps it, Delete removes it); child home shows the
+> today-dated card; **tap-to-start navigated to `/app/voice` carrying the
+> assignment's `subjectKind`/`topic`/`title`/`notes`** in the router state (no
+> subject picker shown); and server validation + authz via in-page fetch
+> (past-date / `minutes:200` / empty-title / bad-subject → **400**, unowned child
+> → **404**, owned child → **200**). **Tabled (needs a human mic run):** whether
+> Pip's *spoken* opening reflects the focus note while staying Socratic — the
+> client wiring is confirmed up to the WS `start` message; the `{{focus}}`
+> prompt-token behavior itself is unit-covered in `test/voice/systemPrompt.test.ts`.
+>
+> Original setup note: run after merging SP12 and applying migration 0008:
 > ```
 > docker exec study-buddy-server-1 sh -c 'cd /app/apps/server && bun run db:migrate'
 > ```
