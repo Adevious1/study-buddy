@@ -121,4 +121,19 @@ describe('PATCH/DELETE /api/children/:childId/assignments/:id', () => {
     const res = await app.fetch(new Request(`http://test/api/children/${MAYA}/assignments/not-a-uuid`, { method: 'DELETE', headers: { Cookie: cookie } }));
     expect(res.status).toBe(400);
   });
+
+  it('400s on an empty-body PATCH (no fields to update)', async () => {
+    const id = await createOne();
+    const res = await app.fetch(new Request(`http://test/api/children/${MAYA}/assignments/${id}`, {
+      method: 'PATCH', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+    }));
+    expect(res.status).toBe(400);
+  });
+
+  it('404s deleting an assignment id that is not this child\'s', async () => {
+    const res = await app.fetch(new Request(`http://test/api/children/${MAYA}/assignments/00000000-0000-0000-0000-0000000000bb`, {
+      method: 'DELETE', headers: { Cookie: cookie },
+    }));
+    expect(res.status).toBe(404);
+  });
 });

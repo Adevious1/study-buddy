@@ -36,8 +36,9 @@ function toDomain(r: typeof assignments.$inferSelect) {
 
 export const assignmentsRoute = new Hono<{ Variables: ChildVariables }>();
 
-// GET today's assignments — note: this MUST be registered before the generic
-// /:childId/assignments GET so Hono matches the literal '/today' segment first.
+// GET today's assignments. (`/today` and the generic list `/:childId/assignments`
+// differ in segment count, so there is no shadowing — registration order is not
+// load-bearing here.)
 assignmentsRoute.get('/:childId/assignments/today', async (c) => {
   const child = c.get('child');
   // Compare against the UTC calendar date so the filter matches how the seed
@@ -115,13 +116,22 @@ assignmentsRoute.patch('/:childId/assignments/:assignmentId', async (c) => {
   if (parsed.data.scheduledDate && parsed.data.scheduledDate < todayUtc()) {
     return c.json({ error: { code: 'invalid_assignment', message: 'scheduledDate is in the past' } }, 400);
   }
-  const patch: Record<string, unknown> = { ...parsed.data };
-  if ('notes' in patch) {
-    patch.notes = patch.notes && String(patch.notes).length ? patch.notes : null;
+  // Build a typed update set field-by-field (so a stray key can't slip through)
+  // and only for fields the patch actually carries.
+  const updates: Partial<typeof assignments.$inferInsert> = {};
+  if (parsed.data.subjectKind !== undefined) updates.subjectKind = parsed.data.subjectKind;
+  if (parsed.data.title !== undefined) updates.title = parsed.data.title;
+  if (parsed.data.scheduledDate !== undefined) updates.scheduledDate = parsed.data.scheduledDate;
+  if (parsed.data.minutes !== undefined) updates.minutes = parsed.data.minutes;
+  if ('notes' in parsed.data) updates.notes = parsed.data.notes?.length ? parsed.data.notes : null;
+  // An empty patch ({} or only-unknown keys) would make Drizzle's .set({}) throw
+  // ("No values to set") → a 500. Treat "nothing to update" as a 400 instead.
+  if (Object.keys(updates).length === 0) {
+    return c.json({ error: { code: 'invalid_assignment', message: 'No fields to update' } }, 400);
   }
   const [row] = await db
     .update(assignments)
-    .set(patch)
+    .set(updates)
     .where(and(eq(assignments.id, id), eq(assignments.childId, child.id)))
     .returning();
   if (!row) {
