@@ -120,20 +120,22 @@ waits for all live relays to finish their fallback recap, bounded by
 The relay was already capable of fallback-recap-on-session-end; the drain harness
 just triggers `finish()` on each live relay and awaits completion — so the
 container exits on budget, sessions get a recap row, and no child sees a frozen
-socket. Targeted rate limiting (`lib/rateLimit.ts`, guardian-keyed sliding window):
+socket. Targeted rate limiting (`lib/rateLimit.ts`, guardian-keyed fixed-window):
 `POST /api/me/pin/verify` 30 req/min, `POST /api/me/children` + billing routes
 10 req/min; live voice sessions are never rate-limited; a 64 KB body cap (`bodyLimit`)
 on all API routes returns `413` before handlers run. Both rate limiter and PIN
 lockout (`lib/pinLockout.ts`, moved off the old module-scope Map) run over a
-swappable `lib/ephemeralStore.ts` seam — a typed async interface (`get`/`set`/`delete`)
-backed by an in-process Map today, making a Postgres backing a true drop-in for
+swappable `lib/ephemeralStore.ts` seam — a typed async interface
+(`increment`/`get`/`set`/`delete`) backed by an in-process Map today, making a
+Postgres backing a true drop-in for
 multi-instance deployments. better-auth's built-in sign-in rate limiter is
 enabled in prod (`NODE_ENV === 'production'`). Miscellaneous nits closed: relay
 `send()` wrapped in try-catch + `reportError` (was silent on a closed WS);
 `geminiSession.close()` is now awaited; an explicit reconnect-in-progress guard
 prevents concurrent reconnect races; `subscriptions.stripe_customer_id` gets an
-index (migration 0007); Zod 400 responses no longer leak `.issues` in
-production. Migration 0007. Smoke `SP11-manual-smoke.md` ⬜ pending. Key files:
+index (migration 0007); Zod 400 responses no longer leak `.issues` (logged
+server-side via `reportError` instead). Migration 0007. Smoke
+`SP11-manual-smoke.md` ⬜ pending. Key files:
 `apps/server/src/lib/ephemeralStore.ts`, `lib/rateLimit.ts`,
 `voice/relayRegistry.ts`, `routes/stripeWebhook.ts`, `lib/entitlement.ts`.
 
