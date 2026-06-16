@@ -74,16 +74,16 @@ const changePinSchema = z.object({
 meRoute.put('/pin', async (c) => {
   const g = c.get('guardian');
   const now = Date.now();
-  if (isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
+  if (await isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
   const parsed = changePinSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: { code: 'invalid_pin', message: 'PINs must be 4 digits' } }, 400);
   if (!g.pinHash) return c.json({ error: { code: 'no_pin', message: 'No PIN set' } }, 400);
   const ok = await Bun.password.verify(parsed.data.currentPin, g.pinHash);
   if (!ok) {
-    recordFail(g.id, now);
+    await recordFail(g.id, now);
     return c.json({ error: { code: 'pin_incorrect', message: 'Wrong PIN' } }, 401);
   }
-  clearFails(g.id);
+  await clearFails(g.id);
   const pinHash = await Bun.password.hash(parsed.data.newPin);
   await db.update(guardians).set({ pinHash }).where(eq(guardians.id, g.id));
   return c.body(null, 204);
@@ -109,24 +109,24 @@ meRoute.post('/pin/reset', async (c) => {
   if (!parsed.success) return c.json({ error: { code: 'invalid_pin', message: 'PIN must be 4 digits' } }, 400);
   const pinHash = await Bun.password.hash(parsed.data.newPin);
   await db.update(guardians).set({ pinHash }).where(eq(guardians.id, g.id));
-  clearFails(g.id);
+  await clearFails(g.id);
   return c.body(null, 204);
 });
 
 meRoute.post('/pin/verify', pinVerifyLimiter, async (c) => {
   const g = c.get('guardian');
   const now = Date.now();
-  if (isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
+  if (await isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
   const parsed = pinSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: { code: 'invalid_pin', message: 'PIN must be 4 digits' } }, 400);
   if (!g.pinHash) return c.json({ error: { code: 'no_pin', message: 'No PIN set' } }, 400);
 
   const ok = await Bun.password.verify(parsed.data.pin, g.pinHash);
   if (!ok) {
-    recordFail(g.id, now);
+    await recordFail(g.id, now);
     return c.json({ error: { code: 'pin_incorrect', message: 'Wrong PIN' } }, 401);
   }
-  clearFails(g.id);
+  await clearFails(g.id);
   await setSignedCookie(c, 'db_unlock', g.id, COOKIE_SECRET, {
     httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 900,
   });
