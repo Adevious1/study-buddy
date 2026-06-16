@@ -446,6 +446,20 @@ describe('voice relay', () => {
     expect(out.control.find((m) => m.type === 'status' && (m as { state: string }).state === 'ended')).toBeTruthy();
   });
 
+  it('does not overlap reconnect attempts', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'x', title: 'x' });
+    const ev = await fake.events();
+    ev.onResumptionHandle('h1');
+    const before = fake.connectCount();
+    ev.onClose('reset');  // triggers reconnect
+    ev.onClose('reset');  // second close while reconnecting — must be ignored
+    await tick();
+    expect(fake.connectCount()).toBe(before + 1); // exactly one extra connect despite two closes
+  });
+
   it('shutdown() finalizes a live session with a fallback recap (no Gemini recap call)', async () => {
     const { createRelayRegistry } = await import('../../src/voice/relayRegistry');
     const fake = makeFakeGemini();

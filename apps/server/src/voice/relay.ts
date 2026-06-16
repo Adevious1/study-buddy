@@ -60,6 +60,7 @@ export function createRelay(opts: RelayOptions) {
   let systemInstruction = '';
   let reconnectCount = 0;
   let draining = false;
+  let reconnecting = false;
   // Forward reference: assigned synchronously at the bottom of createRelay (before
   // any session goes live) so finish() can reference it without a definite-assignment
   // error. The no-op stub is replaced immediately.
@@ -131,37 +132,43 @@ export function createRelay(opts: RelayOptions) {
   }
 
   async function reconnect() {
+    if (reconnecting) return; // never overlap reconnect attempts
+    reconnecting = true;
     // Only the unexpected mid-session Gemini reset reaches here (onClose checks
     // state === 'live'). Mark 'resuming' so handleAudio drops mic input and the
     // client shows "one sec…".
-    state = 'resuming';
-    sink.sendControl({ type: 'status', state: 'resuming' });
-    if (!resumptionHandle) {
-      // No handle yet (sub-~1-min session) — context can't be restored; end cleanly.
-      await finish('completed');
-      return;
-    }
-    const backoffs = opts.reconnectBackoffsMs ?? RECONNECT_BACKOFFS_MS;
-    for (let attempt = 0; ; attempt++) {
-      try {
-        const next = await connectGemini();
-        // The cap or a child-end may have fired during the await.
-        if ((state as State) === 'ended') { try { await next.close(); } catch { /* ignore */ } return; }
-        session = next;
-        state = 'live';
-        reconnectCount += 1;
-        sink.sendControl({ type: 'status', state: 'live' });
+    try {
+      state = 'resuming';
+      sink.sendControl({ type: 'status', state: 'resuming' });
+      if (!resumptionHandle) {
+        // No handle yet (sub-~1-min session) — context can't be restored; end cleanly.
+        await finish('completed');
         return;
-      } catch {
-        if (attempt >= backoffs.length) break;
-        await delay(backoffs[attempt]);
-        if ((state as State) === 'ended') return;
       }
+      const backoffs = opts.reconnectBackoffsMs ?? RECONNECT_BACKOFFS_MS;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const next = await connectGemini();
+          // The cap or a child-end may have fired during the await.
+          if ((state as State) === 'ended') { try { await next.close(); } catch { /* ignore */ } return; }
+          session = next;
+          state = 'live';
+          reconnectCount += 1;
+          sink.sendControl({ type: 'status', state: 'live' });
+          return;
+        } catch {
+          if (attempt >= backoffs.length) break;
+          await delay(backoffs[attempt]);
+          if ((state as State) === 'ended') return;
+        }
+      }
+      if ((state as State) === 'ended') return;
+      reportSignal('reconnect-exhausted', { childId, sessionId: sessionRowId ?? undefined }, 'error');
+      sink.sendControl({ type: 'error', code: 'connection-lost', message: 'Lost connection.' });
+      await finish('completed');
+    } finally {
+      reconnecting = false;
     }
-    if ((state as State) === 'ended') return;
-    reportSignal('reconnect-exhausted', { childId, sessionId: sessionRowId ?? undefined }, 'error');
-    sink.sendControl({ type: 'error', code: 'connection-lost', message: 'Lost connection.' });
-    await finish('completed');
   }
 
   async function start(subjectKind: SubjectKind, topic: string, title: string) {
@@ -286,14 +293,19 @@ export function createRelay(opts: RelayOptions) {
     async handleControl(msg: ClientControl) {
       switch (msg.type) {
         case 'start': await start(msg.subjectKind, msg.topic, msg.title); break;
-        case 'mute': session?.audioStreamEnd(); break;
+        case 'mute':
+          try { session?.audioStreamEnd(); }
+          catch (e) { reportError('relay-send-control', e, { childId, sessionId: sessionRowId ?? undefined }); }
+          break;
         case 'unmute': break;
         case 'snapshot': await handleSnapshot(msg.mime, msg.data); break;
         case 'end': await finish('completed'); break;
       }
     },
     handleAudio(pcm16k: Uint8Array) {
-      if (state === 'live') session?.sendAudio(pcm16k);
+      if (state !== 'live') return;
+      try { session?.sendAudio(pcm16k); }
+      catch (e) { reportError('relay-send-audio', e, { childId, sessionId: sessionRowId ?? undefined }); }
     },
     async handleDisconnect() { await finish('abandoned'); },
     shutdown,

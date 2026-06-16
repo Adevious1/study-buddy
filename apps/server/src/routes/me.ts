@@ -156,7 +156,8 @@ meRoute.post('/children', childCreateLimiter, async (c) => {
   const json = await c.req.json().catch(() => null);
   const parsed = createChildSchema.safeParse(json);
   if (!parsed.success) {
-    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields', issues: parsed.error.issues } }, 400);
+    reportError('child-create-invalid', parsed.error, { guardianId: g.id }, 'warning');
+    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields' } }, 400);
   }
   const today = new Date().toISOString().slice(0, 10);
   const [child] = await db.insert(children).values({
@@ -193,7 +194,8 @@ meRoute.patch('/children/:childId', async (c) => {
   if (!child) return c.json({ error: { code: 'not_found', message: 'Child not found' } }, 404);
   const parsed = updateChildSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
-    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields', issues: parsed.error.issues } }, 400);
+    reportError('child-update-invalid', parsed.error, { guardianId: g.id }, 'warning');
+    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields' } }, 400);
   }
   if (Object.keys(parsed.data).length === 0) {
     return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields' } }, 400);
