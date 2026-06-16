@@ -18,8 +18,10 @@ SP10 (observability), SP11 (production hardening), and SP12 (assignments
 authoring) — are implemented**; SP1–SP9 are smoke-verified (SP7 + SP8 via a
 human mic run and SP9 via a browser run, all on 2026-06-12; the only tabled
 checks are SP5/SP9's live-Stripe click-throughs and SP8's auto-cap firing, each
-unit-covered); SP10's smoke is ⬜ pending (needs Sentry DSNs — see
-`SP10-manual-smoke.md`); SP11's smoke is 🟡 dev-stack-verified 2026-06-16
+unit-covered); SP10's smoke is 🟡 dev-stack-partial 2026-06-16 (ops-metrics
+404→401→200 lifecycle + outcome columns + no-DSN-no-op verified live; the
+Sentry-payload checks and alert rules are tabled needing DSNs, logic
+unit-covered 22/22 — see `SP10-manual-smoke.md`); SP11's smoke is 🟡 dev-stack-verified 2026-06-16
 (rate limit / body limit / PIN lockout via curl + the SIGTERM drain harness via
 `docker restart`; the live-drain recap-fallback, live WS `server-draining`, and
 Stripe-CLI webhook dedup/ordering are tabled but unit-covered — see
@@ -112,7 +114,9 @@ maps upload to Sentry at build time when `SENTRY_AUTH_TOKEN` is set. Everything
 is env-gated: no DSN → Sentry is a no-op; no token → `/api/ops/metrics` returns
 404. Key files: `apps/server/src/observability/`, `apps/server/src/routes/opsMetrics.ts`,
 `apps/web/src/observability/`, `apps/web/src/components/CrashScreen.tsx`. Smoke:
-`SP10-manual-smoke.md` ⬜ pending (needs Sentry DSNs).
+`SP10-manual-smoke.md` 🟡 dev-stack-partial 2026-06-16 (ops-metrics 404→401→200
+lifecycle + outcome columns + no-DSN-no-op live-verified; Sentry-payload checks +
+alert rules tabled needing DSNs, logic unit-covered 22/22).
 
 SP11 (production hardening): a **hardening batch** — not a new product subsystem
 — that closes the main operational risks surfaced in the gap audit. Stripe webhook
@@ -287,9 +291,16 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
   live-Stripe cancel check is tabled (needs test creds, like SP5). Run surfaced an
   ops step: **after merging a migration, run `db:migrate` against the dev stack**
   (`docker exec study-buddy-server-1 sh -c 'cd /app/apps/server && bun run db:migrate'`).
-- `SP10-manual-smoke.md` (observability) — ⬜ **not yet run** (needs a free-tier
-  Sentry account with two projects, their DSNs in `.env`, and
-  `OPS_METRICS_TOKEN=<random>` — see the checklist in the doc).
+- `SP10-manual-smoke.md` (observability) — 🟡 **dev-stack partial** (2026-06-16):
+  the **ops-metrics** endpoint live-verified end to end (at-rest `404` fail-closed;
+  with a transient `OPS_METRICS_TOKEN` → no-header/wrong/missing-`Bearer` all
+  `401`, correct → `200` with completed-only avg + UTC perDay; token reverted
+  after), and the **outcome columns** confirmed populated on real sessions
+  (`recap_source='fallback'`, `reconnect_count` non-null); the env-gated
+  **no-DSN → Sentry no-op** is live (healthy with `SENTRY_DSN` unset). Tabled
+  (need the two Sentry DSNs): the scrubbed server-error payload, the React-crash
+  event, the live unhandled-rejection event, and the alert rules — underlying
+  logic unit-covered (22/22 across scrub/reportError/processHandlers/opsMetrics).
 - `SP11-manual-smoke.md` (production hardening) — 🟡 **dev-stack verified**
   (2026-06-16): rate limit (11× → `429`+`Retry-After`, no junk rows), body limit
   (~70KB → `413`), and PIN lockout (5 wrong → `429 pin_locked`, cleared on
@@ -398,8 +409,10 @@ implementation cycle. **Do not collapse these into one effort.**
     no-ops are log-only; token-guarded fail-closed `GET /api/ops/metrics` (404 when
     env-unset, constant-time bearer check, completed-only avg duration, UTC day
     buckets); kid-friendly `CrashScreen` error boundary; conditional source-map
-    upload. All env-gated: no DSN → no-op; no token → 404. Smoke: ⬜ pending
-    (`SP10-manual-smoke.md`; needs a free-tier Sentry account + DSNs).
+    upload. All env-gated: no DSN → no-op; no token → 404. Smoke: 🟡 dev-stack
+    partial 2026-06-16 (`SP10-manual-smoke.md`; ops-metrics 404→401→200 lifecycle
+    + outcome columns + no-DSN-no-op live-verified, 22/22 unit; Sentry-payload
+    checks + alert rules tabled needing DSNs).
 12. **Assignments authoring** ✓ _implemented_ — guardian CRUD for per-child
     assignments on the dashboard (add/edit/delete with subject, title, date,
     duration, optional focus note); `{{focus}}` prompt token in `study-buddy.md`
