@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client';
 import { assignments } from '../db/schema';
@@ -45,6 +45,17 @@ assignmentsRoute.get('/:childId/assignments/today', async (c) => {
     .from(assignments)
     .where(and(eq(assignments.childId, child.id), eq(assignments.scheduledDate, todayUtc())))
     .orderBy(assignments.createdAt);
+  return c.json(rows.map(toDomain));
+});
+
+// GET management list — upcoming assignments (today and future), ordered by date.
+assignmentsRoute.get('/:childId/assignments', async (c) => {
+  const child = c.get('child');
+  const rows = await db
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.childId, child.id), gte(assignments.scheduledDate, todayUtc())))
+    .orderBy(assignments.scheduledDate, assignments.createdAt);
   return c.json(rows.map(toDomain));
 });
 
