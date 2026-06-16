@@ -21,6 +21,16 @@ describe('rateLimit', () => {
     expect((await third.json() as { error: { code: string } }).error.code).toBe('rate_limited');
   });
 
+  it('opens a fresh window after the old one expires', async () => {
+    const store = new InMemoryEphemeralStore();
+    const app = new Hono();
+    app.post('/x', rateLimit({ limit: 1, windowMs: 20, key: () => 'k', store }), (c) => c.body(null, 204));
+    expect((await app.request('/x', { method: 'POST' })).status).toBe(204); // #1
+    expect((await app.request('/x', { method: 'POST' })).status).toBe(429); // #2 blocked
+    await Bun.sleep(30); // window (20ms) elapses
+    expect((await app.request('/x', { method: 'POST' })).status).toBe(204); // fresh window
+  });
+
   it('keys independently', async () => {
     const store = new InMemoryEphemeralStore();
     const app = new Hono();
