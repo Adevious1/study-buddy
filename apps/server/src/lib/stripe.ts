@@ -15,14 +15,18 @@ const PRICE_ID = () => {
   if (!id) throw new Error('STRIPE_PRICE_ID is required');
   return id;
 };
-// Fail at boot: with the localhost fallback, a prod deploy missing
-// PUBLIC_APP_URL would send Stripe checkout/portal redirects to localhost.
-// (`||` not `??` — docker-compose passes `${PUBLIC_APP_URL:-}`, an empty
-// string when unset, which `??` would keep.)
-if (process.env.NODE_ENV === 'production' && !process.env.PUBLIC_APP_URL) {
-  throw new Error('PUBLIC_APP_URL is required in production (Stripe redirect URLs)');
-}
-const APP_URL = () => process.env.PUBLIC_APP_URL || 'http://localhost:5173';
+// assertBootEnv() requires PUBLIC_APP_URL in prod at boot; this is defense-in-depth
+// at point-of-use so a localhost Stripe redirect URL can never be emitted in
+// production even if the boot check was skipped. `.trim()` treats docker's
+// `${PUBLIC_APP_URL:-}` (empty/whitespace) as missing.
+const APP_URL = (): string => {
+  const url = process.env.PUBLIC_APP_URL?.trim();
+  if (url) return url;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('PUBLIC_APP_URL is required in production (Stripe redirect URLs)');
+  }
+  return 'http://localhost:5173';
+};
 
 export async function createCheckoutSession(opts: {
   customerId: string; quantity: number; trialEnd?: Date | null;

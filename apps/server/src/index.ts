@@ -21,6 +21,7 @@ import { reportError } from './observability/reportError';
 import { ephemeralStore } from './lib/ephemeralStore';
 import * as Sentry from '@sentry/bun';
 import { relayRegistry } from './voice/relayRegistry';
+import { assertBootEnv } from './lib/env';
 
 export const app = new Hono();
 app.use('*', requestLogger);
@@ -76,6 +77,7 @@ const port = Number(process.env.PORT ?? 3001);
 const SHUTDOWN_DRAIN_MS = Number(process.env.SHUTDOWN_DRAIN_MS ?? 25_000);
 
 if (import.meta.main) {
+  assertBootEnv();
   initSentry();
   installProcessHandlers();
   ephemeralStore.startSweep();
