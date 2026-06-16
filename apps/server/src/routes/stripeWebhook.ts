@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
-import { subscriptions } from '../db/schema';
+import { subscriptions, processedStripeEvents } from '../db/schema';
 import { constructWebhookEvent } from '../lib/stripe';
 import { applyStripeEvent, type SubRow, type StripeEventLike } from '../lib/entitlement';
 import { reportSignal } from '../observability/reportError';
@@ -18,33 +18,58 @@ stripeWebhookRoute.post('/', async (c) => {
     return c.json({ error: { code: 'bad_signature', message: 'Invalid signature' } }, 400);
   }
 
+  // Dedup: if we already processed this event id, ack and stop. Recorded AFTER a
+  // successful apply (below), so a crash mid-apply leaves it un-recorded and
+  // Stripe's retry reprocesses it (the reducer is idempotent).
+  if (event.id) {
+    const already = await db
+      .select({ id: processedStripeEvents.eventId })
+      .from(processedStripeEvents)
+      .where(eq(processedStripeEvents.eventId, event.id))
+      .limit(1);
+    if (already.length) return c.body(null, 200);
+  }
+
+  // Residual limitations (event-id dedup + strict-`<` event-time ordering close
+  // exact-redelivery and genuinely-older events): (1) two DISTINCT events racing
+  // concurrently do a read-modify-write on the subscriptions row with no
+  // FOR UPDATE row lock, so a true concurrent interleave could lose a field
+  // update — pre-existing; a transactional apply path is the follow-up.
+  // (2) Ordering is protected at one-second granularity; sub-second `created`
+  // ties resolve by arrival order. The money-critical direction is safe:
+  // `past_due` still entitles (see entitlement ENTITLED_STATUSES), so a stale
+  // event cannot lock out a paying guardian.
   const obj = (event.data.object ?? {}) as unknown as Record<string, unknown>;
   const customerId = (obj.customer as string) ?? null;
-  if (!customerId) return c.body(null, 200); // not a customer-scoped event we track
+  if (!customerId) return c.body(null, 200);
 
   const [row] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, customerId)).limit(1);
   if (!row) {
     reportSignal('webhook-no-subscription-row', { stripeCustomerId: customerId });
-    return c.body(null, 200); // ack; nothing to update
+    return c.body(null, 200);
   }
 
   const cur: SubRow = {
     trialEndsAt: row.trialEndsAt, stripeCustomerId: row.stripeCustomerId,
     stripeSubscriptionId: row.stripeSubscriptionId, status: row.status,
     currentPeriodEnd: row.currentPeriodEnd, seats: row.seats,
+    lastStripeEventAt: row.lastStripeEventAt,
   };
-  // Accepted limitation: events are applied in arrival order with no event-id dedup
-  // or current_period_end monotonicity guard, so a late/out-of-order event could
-  // overwrite newer state. Stripe does not guarantee delivery order; hardening
-  // (persist event.id, or refuse to move current_period_end backwards) is follow-up
-  // work. See docs/superpowers/SP5-manual-smoke.md "Known limitations".
-  const next = applyStripeEvent(cur, event as unknown as StripeEventLike);
-  await db.update(subscriptions).set({
-    stripeSubscriptionId: next.stripeSubscriptionId,
-    status: next.status,
-    currentPeriodEnd: next.currentPeriodEnd,
-    seats: next.seats,
-  }).where(eq(subscriptions.guardianId, row.guardianId));
-
+  const createdMs = typeof event.created === 'number' ? event.created * 1000 : Date.now();
+  const next = applyStripeEvent(cur, event as unknown as StripeEventLike, createdMs);
+  if (next !== cur) {
+    await db.update(subscriptions).set({
+      stripeSubscriptionId: next.stripeSubscriptionId,
+      status: next.status,
+      currentPeriodEnd: next.currentPeriodEnd,
+      seats: next.seats,
+      lastStripeEventAt: next.lastStripeEventAt,
+    }).where(eq(subscriptions.guardianId, row.guardianId));
+  }
+  if (event.id) {
+    await db.insert(processedStripeEvents).values({ eventId: event.id }).onConflictDoNothing();
+  } else {
+    reportSignal('webhook-missing-event-id', { type: event.type });
+  }
   return c.body(null, 200);
 });

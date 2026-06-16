@@ -15,11 +15,36 @@ import { meRoute } from './routes/me';
 import { billingRoute } from './routes/billing';
 import { stripeWebhookRoute } from './routes/stripeWebhook';
 import { opsMetricsRoute } from './routes/opsMetrics';
+import { bodyLimit } from 'hono/body-limit';
 import { initSentry, installProcessHandlers } from './observability/sentry';
 import { reportError } from './observability/reportError';
+import { ephemeralStore } from './lib/ephemeralStore';
+import * as Sentry from '@sentry/bun';
+import { relayRegistry } from './voice/relayRegistry';
 
 export const app = new Hono();
 app.use('*', requestLogger);
+
+const MAX_BODY_BYTES = 64 * 1024;
+const jsonBodyLimit = bodyLimit({
+  maxSize: MAX_BODY_BYTES,
+  onError: (c) => c.json({ error: { code: 'payload_too_large', message: 'Body too large' } }, 413),
+});
+app.use('/api/*', async (c, next) => {
+  // WS upgrades carry no body; the Stripe webhook needs its exact raw body for
+  // signature verification — skip both, cap everything else.
+  if (c.req.header('upgrade')?.toLowerCase() === 'websocket') return next();
+  if (c.req.path.startsWith('/api/stripe/webhook')) return next();
+  return jsonBodyLimit(c, next);
+});
+
+app.use('*', async (c, next) => {
+  if (relayRegistry.isDraining()) {
+    return c.json({ error: { code: 'draining', message: 'Server is restarting' } }, 503);
+  }
+  return next();
+});
+
 app.route('/', healthRoute);
 // better-auth handler — public, must precede the child-scoped /api routes
 app.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw));
@@ -48,9 +73,28 @@ app.onError((err, c) => {
 });
 
 const port = Number(process.env.PORT ?? 3001);
+const SHUTDOWN_DRAIN_MS = Number(process.env.SHUTDOWN_DRAIN_MS ?? 25_000);
+
 if (import.meta.main) {
   initSentry();
   installProcessHandlers();
+  ephemeralStore.startSweep();
   console.log(`[server] listening on :${port}`);
-  Bun.serve({ port, fetch: app.fetch, websocket: voiceWebsocket });
+  const server = Bun.serve({ port, fetch: app.fetch, websocket: voiceWebsocket });
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return; // idempotent: a second signal during drain is ignored
+    shuttingDown = true;
+    console.log(`[server] ${signal} — draining ${relayRegistry.size()} live session(s)`);
+    relayRegistry.beginDraining();
+    try {
+      await relayRegistry.drainAll(SHUTDOWN_DRAIN_MS);
+    } catch { /* best-effort */ }
+    try { await Sentry.flush(2000); } catch { /* best-effort */ }
+    server.stop();
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
+  process.on('SIGINT', () => { void shutdown('SIGINT'); });
 }

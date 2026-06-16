@@ -101,7 +101,7 @@ export function makeGeminiConnector(apiKey: string): GeminiConnector {
       ackTool: (id, name) =>
         session.sendToolResponse({ functionResponses: [{ id, name, response: { ok: true } }] }),
       audioStreamEnd: () => session.sendRealtimeInput({ audioStreamEnd: true }),
-      close: async () => { session.close(); },
+      close: async () => { await Promise.resolve(session.close()); },
     };
   };
 }

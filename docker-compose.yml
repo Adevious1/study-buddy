@@ -42,6 +42,8 @@ services:
       # Observability (SP10) — optional; unset = disabled
       SENTRY_DSN: ${SENTRY_DSN:-}
       OPS_METRICS_TOKEN: ${OPS_METRICS_TOKEN:-}
+      # Hardening (SP11) — graceful-shutdown drain budget (ms); default 25s
+      SHUTDOWN_DRAIN_MS: ${SHUTDOWN_DRAIN_MS:-25000}
     volumes:
       - ./apps/server:/app/apps/server
       - ./packages/shared:/app/packages/shared

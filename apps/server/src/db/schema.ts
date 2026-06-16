@@ -85,8 +85,14 @@ export const subscriptions = pgTable('subscriptions', {
   status: text('status'),
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
   seats: integer('seats').notNull().default(0),
+  // SP11: the Stripe `created` time of the last applied state-changing event,
+  // for out-of-order delivery rejection. Null until the first event lands.
+  lastStripeEventAt: timestamp('last_stripe_event_at', { withTimezone: true }),
   ...timestamps,
-});
+}, (t) => ({
+  // SP11: the Stripe webhook hot path looks up by customer id; index it.
+  stripeCustomerIdx: index('subscriptions_stripe_customer_idx').on(t.stripeCustomerId),
+}));
 
 export const children = pgTable(
   'children',
@@ -225,3 +231,9 @@ export const sessionSnapshots = pgTable(
     childCreatedIdx: index('session_snapshots_child_created_idx').on(t.childId, t.createdAt.desc()),
   }),
 );
+
+// SP11: idempotency ledger for Stripe webhooks — one row per processed event id.
+export const processedStripeEvents = pgTable('processed_stripe_events', {
+  eventId: text('event_id').primaryKey(),
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+});

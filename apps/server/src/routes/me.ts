@@ -11,12 +11,18 @@ import { deleteAccount, StripeCancelError } from '../lib/accountLifecycle';
 import { auth } from '../lib/auth';
 import type { MeResponse } from '@study-buddy/shared';
 import { reportError } from '../observability/reportError';
+import { rateLimit } from '../lib/rateLimit';
 
 export const meRoute = new Hono<{ Variables: GuardianVariables }>();
 meRoute.use('*', guardianContext);
 
 const COOKIE_SECRET = process.env.BETTER_AUTH_SECRET || 'dev-only-change-me';
 const pinSchema = z.object({ pin: z.string().regex(/^\d{4}$/) });
+
+// Generous backstop ABOVE the 5-fail PIN lockout (the lockout is the primary
+// brute-force guard); this only catches request flooding.
+const pinVerifyLimiter = rateLimit({ name: 'pin-verify', limit: 30, windowMs: 60_000, key: (c) => c.get('guardian').id });
+const childCreateLimiter = rateLimit({ name: 'child-create', limit: 10, windowMs: 60_000, key: (c) => c.get('guardian').id });
 
 meRoute.get('/', async (c) => {
   const g = c.get('guardian');
@@ -68,16 +74,16 @@ const changePinSchema = z.object({
 meRoute.put('/pin', async (c) => {
   const g = c.get('guardian');
   const now = Date.now();
-  if (isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
+  if (await isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
   const parsed = changePinSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: { code: 'invalid_pin', message: 'PINs must be 4 digits' } }, 400);
   if (!g.pinHash) return c.json({ error: { code: 'no_pin', message: 'No PIN set' } }, 400);
   const ok = await Bun.password.verify(parsed.data.currentPin, g.pinHash);
   if (!ok) {
-    recordFail(g.id, now);
+    await recordFail(g.id, now);
     return c.json({ error: { code: 'pin_incorrect', message: 'Wrong PIN' } }, 401);
   }
-  clearFails(g.id);
+  await clearFails(g.id);
   const pinHash = await Bun.password.hash(parsed.data.newPin);
   await db.update(guardians).set({ pinHash }).where(eq(guardians.id, g.id));
   return c.body(null, 204);
@@ -103,24 +109,24 @@ meRoute.post('/pin/reset', async (c) => {
   if (!parsed.success) return c.json({ error: { code: 'invalid_pin', message: 'PIN must be 4 digits' } }, 400);
   const pinHash = await Bun.password.hash(parsed.data.newPin);
   await db.update(guardians).set({ pinHash }).where(eq(guardians.id, g.id));
-  clearFails(g.id);
+  await clearFails(g.id);
   return c.body(null, 204);
 });
 
-meRoute.post('/pin/verify', async (c) => {
+meRoute.post('/pin/verify', pinVerifyLimiter, async (c) => {
   const g = c.get('guardian');
   const now = Date.now();
-  if (isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
+  if (await isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
   const parsed = pinSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: { code: 'invalid_pin', message: 'PIN must be 4 digits' } }, 400);
   if (!g.pinHash) return c.json({ error: { code: 'no_pin', message: 'No PIN set' } }, 400);
 
   const ok = await Bun.password.verify(parsed.data.pin, g.pinHash);
   if (!ok) {
-    recordFail(g.id, now);
+    await recordFail(g.id, now);
     return c.json({ error: { code: 'pin_incorrect', message: 'Wrong PIN' } }, 401);
   }
-  clearFails(g.id);
+  await clearFails(g.id);
   await setSignedCookie(c, 'db_unlock', g.id, COOKIE_SECRET, {
     httpOnly: true, sameSite: 'Lax', path: '/', maxAge: 900,
   });
@@ -141,7 +147,7 @@ const createChildSchema = z.object({
   consent: z.literal(true),
 });
 
-meRoute.post('/children', async (c) => {
+meRoute.post('/children', childCreateLimiter, async (c) => {
   const g = c.get('guardian');
   const ent = await getEntitlement(g.id);
   if (!ent.entitled) {
@@ -150,7 +156,8 @@ meRoute.post('/children', async (c) => {
   const json = await c.req.json().catch(() => null);
   const parsed = createChildSchema.safeParse(json);
   if (!parsed.success) {
-    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields', issues: parsed.error.issues } }, 400);
+    reportError('child-create-invalid', parsed.error, { guardianId: g.id }, 'warning');
+    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields' } }, 400);
   }
   const today = new Date().toISOString().slice(0, 10);
   const [child] = await db.insert(children).values({
@@ -187,7 +194,8 @@ meRoute.patch('/children/:childId', async (c) => {
   if (!child) return c.json({ error: { code: 'not_found', message: 'Child not found' } }, 404);
   const parsed = updateChildSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
-    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields', issues: parsed.error.issues } }, 400);
+    reportError('child-update-invalid', parsed.error, { guardianId: g.id }, 'warning');
+    return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields' } }, 400);
   }
   if (Object.keys(parsed.data).length === 0) {
     return c.json({ error: { code: 'invalid_child', message: 'Invalid child fields' } }, 400);

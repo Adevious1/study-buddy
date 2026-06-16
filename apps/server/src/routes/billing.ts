@@ -6,9 +6,12 @@ import { guardianContext, type GuardianVariables } from '../lib/guardianContext'
 import { getEntitlement, getOrCreateCustomer, childCount } from '../lib/billing';
 import { createCheckoutSession, createPortalSession } from '../lib/stripe';
 import { reportError } from '../observability/reportError';
+import { rateLimit } from '../lib/rateLimit';
 
 export const billingRoute = new Hono<{ Variables: GuardianVariables }>();
 billingRoute.use('*', guardianContext);
+
+const billingActionLimiter = rateLimit({ name: 'billing', limit: 10, windowMs: 60_000, key: (c) => c.get('guardian').id });
 
 billingRoute.get('/', async (c) => {
   const g = c.get('guardian');
@@ -21,7 +24,7 @@ billingRoute.get('/', async (c) => {
   });
 });
 
-billingRoute.post('/checkout', async (c) => {
+billingRoute.post('/checkout', billingActionLimiter, async (c) => {
   const g = c.get('guardian');
   try {
     const customerId = await getOrCreateCustomer(g.id);
@@ -38,7 +41,7 @@ billingRoute.post('/checkout', async (c) => {
   }
 });
 
-billingRoute.post('/portal', async (c) => {
+billingRoute.post('/portal', billingActionLimiter, async (c) => {
   const g = c.get('guardian');
   try {
     const customerId = await getOrCreateCustomer(g.id);

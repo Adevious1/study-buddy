@@ -1,23 +1,34 @@
-// Dashboard-PIN attempt lockout. NOTE: in-memory and per-guardian — it resets on
-// server restart and is NOT shared across instances (acceptable for SP4's
-// single-instance deployment). It's also shared across a guardian's sessions, so
-// it gates the dashboard, not a high-value secret — the dashboard data is already
-// behind guardian auth; the PIN is a kid-resistant UI gate. Revisit (persistent +
-// per-device) if the PIN ever protects something sensitive.
+// apps/server/src/lib/pinLockout.ts
+import { ephemeralStore, type EphemeralStore } from './ephemeralStore';
+
+// Dashboard-PIN attempt lockout. Now backed by the shared EphemeralStore (SP11):
+// still in-memory per-instance, but the moment the store gains a Postgres backing
+// this becomes restart-survivable + cross-instance with NO change here. It gates
+// the dashboard (a kid-resistant UI gate over already-guardian-authed data), not a
+// high-value secret. Async because the store is async (Postgres drop-in seam).
 const MAX_FAILS = 5;
 const LOCK_MS = 60_000;
-const attempts = new Map<string, { fails: number; until: number }>();
+// Fails persist long enough to matter within a session, but self-clean (the old
+// in-memory Map never expired them). An hour comfortably covers a brute-force burst.
+const FAIL_TTL_MS = 60 * 60_000;
 
-export function isLocked(guardianId: string, now: number): boolean {
-  const a = attempts.get(guardianId);
-  return !!a && a.until > now;
+const failKey = (guardianId: string) => `pinfail:${guardianId}`;
+const lockKey = (guardianId: string) => `pinlock:${guardianId}`;
+
+export async function isLocked(guardianId: string, now: number, store: EphemeralStore = ephemeralStore): Promise<boolean> {
+  const until = await store.get(lockKey(guardianId), now);
+  return until !== null && until > now;
 }
-export function recordFail(guardianId: string, now: number): void {
-  const a = attempts.get(guardianId) ?? { fails: 0, until: 0 };
-  a.fails += 1;
-  if (a.fails >= MAX_FAILS) { a.until = now + LOCK_MS; a.fails = 0; }
-  attempts.set(guardianId, a);
+
+export async function recordFail(guardianId: string, now: number, store: EphemeralStore = ephemeralStore): Promise<void> {
+  const { count } = await store.increment(failKey(guardianId), FAIL_TTL_MS, now);
+  if (count >= MAX_FAILS) {
+    await store.set(lockKey(guardianId), now + LOCK_MS, LOCK_MS, now);
+    await store.delete(failKey(guardianId));
+  }
 }
-export function clearFails(guardianId: string): void {
-  attempts.delete(guardianId);
+
+export async function clearFails(guardianId: string, _now?: number, store: EphemeralStore = ephemeralStore): Promise<void> {
+  await store.delete(failKey(guardianId));
+  await store.delete(lockKey(guardianId));
 }

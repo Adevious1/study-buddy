@@ -445,4 +445,55 @@ describe('voice relay', () => {
     expect(out.control.find((m) => m.type === 'error' && (m as { code: string }).code === 'connection-lost')).toBeTruthy();
     expect(out.control.find((m) => m.type === 'status' && (m as { state: string }).state === 'ended')).toBeTruthy();
   });
+
+  it('does not overlap reconnect attempts', async () => {
+    const fake = makeFakeGemini();
+    const out = sink();
+    const relay = createRelay({ childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'x', title: 'x' });
+    const ev = await fake.events();
+    ev.onResumptionHandle('h1');
+    const before = fake.connectCount();
+    ev.onClose('reset');  // triggers reconnect
+    ev.onClose('reset');  // second close while reconnecting — must be ignored
+    await tick();
+    expect(fake.connectCount()).toBe(before + 1); // exactly one extra connect despite two closes
+  });
+
+  it('shutdown() finalizes a live session with a fallback recap (no Gemini recap call)', async () => {
+    const { createRelayRegistry } = await import('../../src/voice/relayRegistry');
+    const fake = makeFakeGemini();
+    const out = sink();
+    const registry = createRelayRegistry();
+    // A recapGenerator that would return source 'model' if called — drain must bypass it
+    const recapGen = makeFakeRecapGenerator({
+      figuredOut: [], solvedSelf: 0, solvedTotal: 0, starsEarned: 1,
+      insightTitle: 't', insightBody: 'b', insightBadge: 'B',
+    });
+    const relay = createRelay({
+      childId: VOICE_TEST_CHILD_ID, connector: fake.connector, sink: out,
+      recapGenerator: recapGen, registry,
+    });
+    await relay.handleControl({ type: 'start', subjectKind: 'math', topic: 'Adding', title: 'Adding' });
+    await fake.events();
+    expect(registry.size()).toBe(1); // registered on go-live
+
+    await registry.drainAll(1000);
+
+    await waitFor(() => hasEnded(out));
+    expect(registry.size()).toBe(0); // unregistered in finish
+
+    // Look up the session row the same way the existing recap tests do
+    const { db } = await import('../../src/db/client');
+    const { sessions } = await import('../../src/db/schema');
+    const { and, desc, eq } = await import('drizzle-orm');
+    const [row] = await db.select().from(sessions)
+      .where(and(eq(sessions.childId, VOICE_TEST_CHILD_ID), eq(sessions.state, 'completed')))
+      .orderBy(desc(sessions.endedAt)).limit(1);
+
+    expect(row.state).toBe('completed');
+    expect(row.recapSource).toBe('fallback'); // drain forces fallback, not the model gen
+    // The recapGenerator was NOT called (drain short-circuits to null generator)
+    expect(recapGen.calls).toHaveLength(0);
+  });
 });

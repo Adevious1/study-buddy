@@ -18,6 +18,7 @@ export async function getEntitlement(guardianId: string): Promise<Entitlement> {
     status: row.status,
     currentPeriodEnd: row.currentPeriodEnd,
     seats: row.seats,
+    lastStripeEventAt: row.lastStripeEventAt,
   };
   const ent = entitlementOf(sub, new Date());
   // entitlementOf returns status as `string | null`; the reducer only persists
