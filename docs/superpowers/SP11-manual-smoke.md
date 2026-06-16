@@ -29,11 +29,15 @@ SP5 live-Stripe smoke (needs the Stripe CLI).
 
 ## Known residuals (documented, not bugs)
 
-- Webhook apply is not wrapped in a `SELECT … FOR UPDATE` transaction, so two
+- ~~Webhook apply is not wrapped in a `SELECT … FOR UPDATE` transaction, so two
   genuinely-concurrent *distinct* events doing read-modify-write on the same
-  subscription row could lose a field update. Pre-existing; event-id dedup +
-  event-time ordering close the redelivery/out-of-order cases. A transactional
-  apply path is the follow-up (carry to the P2 backlog).
+  subscription row could lose a field update.~~ ✅ **Fixed** (2026-06-16): the
+  apply path (`processStripeEvent` in `routes/stripeWebhook.ts`) now runs the
+  row read-modify-write + dedup insert in one `db.transaction` with
+  `SELECT … FOR UPDATE`, serializing concurrent same-customer events. Covered by
+  a deterministic lost-update regression test (`test/billing/webhookApply.test.ts`).
+  Residual: ordering is still one-second-granular (sub-second `created` ties
+  resolve by arrival order; money-critical direction stays safe).
 - Rate limiting + PIN-lockout are in-memory (single-instance); the Postgres
   backing of the ephemeral-store seam is the multi-instance trigger.
 
