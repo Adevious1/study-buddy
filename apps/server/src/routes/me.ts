@@ -11,12 +11,18 @@ import { deleteAccount, StripeCancelError } from '../lib/accountLifecycle';
 import { auth } from '../lib/auth';
 import type { MeResponse } from '@study-buddy/shared';
 import { reportError } from '../observability/reportError';
+import { rateLimit } from '../lib/rateLimit';
 
 export const meRoute = new Hono<{ Variables: GuardianVariables }>();
 meRoute.use('*', guardianContext);
 
 const COOKIE_SECRET = process.env.BETTER_AUTH_SECRET || 'dev-only-change-me';
 const pinSchema = z.object({ pin: z.string().regex(/^\d{4}$/) });
+
+// Generous backstop ABOVE the 5-fail PIN lockout (the lockout is the primary
+// brute-force guard); this only catches request flooding.
+const pinVerifyLimiter = rateLimit({ name: 'pin-verify', limit: 30, windowMs: 60_000, key: (c) => c.get('guardian').id });
+const childCreateLimiter = rateLimit({ name: 'child-create', limit: 10, windowMs: 60_000, key: (c) => c.get('guardian').id });
 
 meRoute.get('/', async (c) => {
   const g = c.get('guardian');
@@ -107,7 +113,7 @@ meRoute.post('/pin/reset', async (c) => {
   return c.body(null, 204);
 });
 
-meRoute.post('/pin/verify', async (c) => {
+meRoute.post('/pin/verify', pinVerifyLimiter, async (c) => {
   const g = c.get('guardian');
   const now = Date.now();
   if (isLocked(g.id, now)) return c.json({ error: { code: 'pin_locked', message: 'Too many attempts' } }, 429);
@@ -141,7 +147,7 @@ const createChildSchema = z.object({
   consent: z.literal(true),
 });
 
-meRoute.post('/children', async (c) => {
+meRoute.post('/children', childCreateLimiter, async (c) => {
   const g = c.get('guardian');
   const ent = await getEntitlement(g.id);
   if (!ent.entitled) {

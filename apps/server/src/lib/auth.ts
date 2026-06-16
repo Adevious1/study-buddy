@@ -44,6 +44,17 @@ export const auth = betterAuth({
   },
   // Dev/test-only: lets the seed guardian sign in without Google. Disabled in prod.
   emailAndPassword: { enabled: !isProd },
+  // Built-in limiter (in-memory). Prod-only so the dev/test suite — which signs
+  // many guardians up in one process — isn't throttled. Tight rule on the
+  // brute-forceable sign-in path; broad default elsewhere.
+  rateLimit: {
+    enabled: isProd,
+    window: 60,
+    max: 100,
+    customRules: {
+      '/sign-in/email': { window: 60, max: 5 },
+    },
+  },
   databaseHooks: {
     user: {
       create: {
