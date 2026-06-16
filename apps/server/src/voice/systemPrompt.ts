@@ -12,6 +12,8 @@ export interface SystemPromptInput {
   traits: LearningStyleTrait[];
   /** True only on the child's very first session ever; gates Pip's self-intro. */
   firstSession: boolean;
+  /** Optional guardian-authored focus note for this assignment. */
+  notes?: string;
 }
 
 /**
@@ -28,6 +30,8 @@ You are helping with {{subject}} — specifically "{{topic}}".
 
 ## Greeting
 {{intro}}
+
+{{focus}}
 
 ## Starting a session
 Open by greeting {{childName}} by name, then ask what they are currently learning — is it a lesson they are doing in class, a homework assignment, or a project they are working on? Use their answer to form a guideline on the subject matter. Then be inquisitive: ask {{childName}} what they already know about the subject, and gently see whether they truly know any of their facts. You are this child's one-on-one teacher.
@@ -101,6 +105,15 @@ function intro(input: SystemPromptInput): string {
     : `${input.childName} already knows you as Pip. Do NOT introduce yourself or say "I'm Pip" again — just greet them warmly by name and get started.`;
 }
 
+/** The `{{focus}}` value: the guardian's per-assignment note, framed as where to
+ *  begin — never as license to abandon the Socratic rule. Empty when no note. */
+function focus(input: SystemPromptInput): string {
+  const n = input.notes?.trim();
+  return n
+    ? `The grown-up shared what to focus on this time: "${n}". Use it to choose where you begin — but you still guide ${input.childName} Socratically and never just give the answer.`
+    : '';
+}
+
 export async function buildSystemInstruction(input: SystemPromptInput): Promise<string> {
   const tpl = await loadTemplate();
   return renderTemplate(tpl, {
@@ -110,5 +123,6 @@ export async function buildSystemInstruction(input: SystemPromptInput): Promise<
     topic: input.topic,
     traitLean: traitLean(input),
     intro: intro(input),
+    focus: focus(input),
   });
 }

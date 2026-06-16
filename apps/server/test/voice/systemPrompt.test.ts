@@ -124,6 +124,19 @@ describe('intro token (first-session gating)', () => {
   });
 });
 
+describe('{{focus}} token', () => {
+  const base = { childName: 'Maya', grade: 3, subjectKind: 'math' as const, topic: 'Adding', traits: [], firstSession: false };
+  it('renders the focus line when notes are present', async () => {
+    const out = await buildSystemInstruction({ ...base, notes: 'borrowing across zeros' });
+    expect(out).toContain('borrowing across zeros');
+    expect(out.toLowerCase()).toContain('focus');
+  });
+  it('omits the focus line when notes are absent', async () => {
+    const out = await buildSystemInstruction(base);
+    expect(out).not.toContain('focus on');
+  });
+});
+
 describe('BUILTIN_TEMPLATE', () => {
   it('contains all six tokens', () => {
     for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{intro}}', '{{traitLean}}']) {
