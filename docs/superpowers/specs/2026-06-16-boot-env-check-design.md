@@ -155,6 +155,17 @@ The lazy `STRIPE_*` getters stay: they protect point-of-use and let the test
 suite run without Stripe creds. The boot check additionally requires them in prod
 at startup (fail-fast) rather than only on the first billing request.
 
+> **Addendum (post commit security review):** the `BETTER_AUTH_SECRET` and
+> `PUBLIC_APP_URL` throws are **not** fully removed — they are retained as a
+> minimal prod fail-safe (defense-in-depth). `auth.ts` constructs `betterAuth()`
+> at import time, so the well-known dev secret could otherwise reach a production
+> auth instance via an entrypoint that skips `assertBootEnv`; `auth.ts` keeps an
+> import-time prod guard, and `stripe.ts`'s `APP_URL()` throws in prod when unset
+> (point-of-use). `assertBootEnv` remains the primary, aggregated check; these
+> guards only matter if it is bypassed. `GEMINI_API_KEY`'s throw is removed (its
+> connector merely warns on an empty key until a session is attempted, so there
+> is no module-load forgery/redirect risk).
+
 ## `.env.example` (new — `apps/server/.env.example`)
 
 Every var grouped, one-line note each:

@@ -9,10 +9,16 @@ import { reportError } from '../observability/reportError';
 
 const isProd = process.env.NODE_ENV === 'production';
 
-// docker-compose passes BETTER_AUTH_SECRET as `${BETTER_AUTH_SECRET:-}`, which is
-// an empty string (not undefined) when unset — so `?? fallback` would NOT fire and
-// better-auth would silently run with an empty secret. (`||` not `??`)
-const secret = process.env.BETTER_AUTH_SECRET || 'dev-only-change-me';
+// `betterAuth()` is constructed at module load (import phase), BEFORE assertBootEnv()
+// runs in index.ts. assertBootEnv is the primary, friendly prod check; this is
+// defense-in-depth so the well-known dev secret can never reach a production auth
+// instance even via an entrypoint that skips the boot check. `.trim()` also treats
+// docker's `${BETTER_AUTH_SECRET:-}` (empty/whitespace) as missing.
+const rawSecret = process.env.BETTER_AUTH_SECRET?.trim();
+if (isProd && !rawSecret) {
+  throw new Error('BETTER_AUTH_SECRET is required in production');
+}
+const secret = rawSecret || 'dev-only-change-me';
 
 export const auth = betterAuth({
   // `||` not `??`: docker-compose passes BETTER_AUTH_URL as `${BETTER_AUTH_URL:-}`,
