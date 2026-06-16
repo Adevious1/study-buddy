@@ -1,31 +1,46 @@
 # SP11 manual smoke — production hardening
 
-Status: ⬜ not yet run. Most checks need only the dev stack
-(`docker compose up -d`); the webhook ordering check pairs with the still-tabled
-SP5 live-Stripe smoke (needs the Stripe CLI).
+Status: 🟡 **dev-stack verified** (2026-06-16). The three headless checks
+(rate limit, body limit, PIN lockout) and the SIGTERM drain *harness* are
+live-verified against the running dev stack; the full live-drain-during-an-active-
+session recap-fallback, the live WS `server-draining` frame, and the Stripe-CLI
+webhook dedup/ordering are **tabled** (need a mic/Gemini session or the Stripe
+CLI) but are each covered by passing unit tests. See Results below.
 
 ## Checklist
 
-- [ ] **Rate limit (PIN-adjacent backstop).** Rapidly POST `/api/me/children`
-  >10×/min as one guardian → a `429` with `Retry-After` appears; normal paced
-  use is unaffected. A live voice session is never throttled.
-- [ ] **Body limit.** `curl` a >64KB JSON body to `/api/me/pin` → `413` before
-  the handler; a normal body passes.
-- [ ] **Graceful shutdown.** Start a live voice session in the browser, then
-  `docker compose restart server` (SIGTERM). The child sees the session end and
-  lands on a recap screen (not a frozen socket); the container exits within
-  ~25s; `psql`: the session row is `completed` with a transcript +
-  `recap_source = 'fallback'`. Note: a session still in the *connecting* state
-  (not yet live) is not registered, so it is not drained — acceptable (no
-  transcript yet).
-- [ ] **Draining rejects new.** While the server is mid-drain, a new request →
-  `503`; a new voice WS → an immediate `server-draining` error.
-- [ ] **Webhook dedup + ordering** (Stripe CLI; pairs with SP5). `stripe events
-  resend <id>` a processed event → second delivery is a no-op (row unchanged).
-  Deliver an out-of-order older `invoice.payment_failed` after `invoice.paid` →
-  entitlement stays `active` (no wrongful lockout).
-- [ ] **PIN lockout via the store.** 5 wrong dashboard PINs → locked (429);
-  behavior identical to pre-refactor; survives within the process.
+- [x] **Rate limit (PIN-adjacent backstop).** ✅ 11 rapid `POST /api/me/children`
+  (invalid `{}` bodies) as the seed guardian → first 10 `400`, 11th `429` with
+  `Retry-After: 60`; child count unchanged (no junk rows — the limiter counts
+  attempts before the handler validates). Live voice sessions are never throttled.
+- [x] **Body limit.** ✅ `curl` a ~70KB JSON body to `/api/me/pin` → `413` before
+  the handler; a normal `{"pin":…}` body reaches the handler (`409
+  pin_already_set`), confirming normal traffic passes.
+- [🟡] **Graceful shutdown.** Harness live-verified: `docker restart
+  study-buddy-server-1` (SIGTERM) → `[server] SIGTERM — draining 0 live
+  session(s)` then clean exit + healthy restart (`[server] listening on :3001`,
+  `/healthz` 200), all well within ~25s. The full path — a *live* session
+  draining to a `completed` row with a transcript + `recap_source = 'fallback'` —
+  is **tabled** (needs a mic/Gemini session) but is covered by
+  `test/voice/relay.test.ts:463` ("shutdown() finalizes a live session with a
+  fallback recap"; registers on go-live → `drainAll` → unregisters, fallback
+  recap, the model generator is *not* called). Note: a session still
+  *connecting* (not yet live) is not registered, so it is not drained.
+- [🟡] **Draining rejects new.** Logic unit-covered, live window tabled (a
+  zero-session drain exits too fast to catch the window). The `503` draining
+  middleware (`index.ts:42`), the `server-draining` WS frame (`voiceRoute.ts:26`),
+  and `relayRegistry` draining-state (`relayRegistry.test.ts:31`) are all in place
+  and tested.
+- [ ] **Webhook dedup + ordering** (Stripe CLI; pairs with SP5) — **tabled**
+  (needs the Stripe CLI). Logic unit-covered: `src/routes/stripeWebhook.test.ts`
+  (event-id dedup) + `test/billing/webhookApply.test.ts` (event-time ordering +
+  the `FOR UPDATE` lost-update regression).
+- [x] **PIN lockout via the store.** ✅ 5 wrong dashboard PINs (`0000`) →
+  `401 pin_incorrect`; 6th → `429 pin_locked`; the *correct* PIN is also rejected
+  while locked (the `isLocked` gate precedes verification). After `docker restart`
+  the lock cleared (correct PIN → `204`) — confirming the documented in-memory /
+  single-instance residual (and that the better-auth session, being in Postgres,
+  survived the restart).
 
 ## Known residuals (documented, not bugs)
 
@@ -43,4 +58,26 @@ SP5 live-Stripe smoke (needs the Stripe CLI).
 
 ## Results
 
-_(fill in when run)_
+**2026-06-16 — dev-stack smoke (headless curl + `docker restart` + targeted unit
+run).** Stack on the localhost env (server `:3001`, Postgres `:5432`), seed
+guardian `parent@studybuddy.dev` (PIN `1234`, child Maya).
+
+- **Rate limit** ✅ — 11× `POST /api/me/children` `{}` → `400 ×10`, then
+  `429` + `Retry-After: 60`; child count `1 → 1` (no rows created).
+- **Body limit** ✅ — ~70KB body to `/api/me/pin` → `413`; small body → `409`
+  (handler reached).
+- **PIN lockout** ✅ — 5× wrong `0000` → `401`, 6th → `429 pin_locked`; correct
+  `1234` also `429` while locked. Lock cleared by the subsequent restart
+  (`204`), session cookie survived (Postgres-backed) → documented in-memory
+  residual confirmed.
+- **Graceful shutdown** 🟡 — `docker restart` logged `[server] SIGTERM —
+  draining 0 live session(s)` → clean exit → healthy reboot (`listening on
+  :3001`, `/healthz` 200) inside the 25s budget. Live recap-fallback drain
+  tabled (mic) — unit-covered (`relay.test.ts:463`).
+- **Draining rejects new** 🟡 — code in place + unit-covered; live window tabled
+  (zero-session drain exits too fast to observe).
+- **Webhook dedup + ordering** ⬜ — tabled (Stripe CLI; pairs with SP5);
+  unit-covered (`stripeWebhook.test.ts` + `webhookApply.test.ts`).
+
+Targeted unit run (test PG on `:5433`): **40/40 pass** across `rateLimit`,
+`ephemeralStore`, `relayRegistry`, `relay`, `webhookApply`, `stripeWebhook`.
