@@ -19,7 +19,11 @@ authoring) — are implemented**; SP1–SP9 are smoke-verified (SP7 + SP8 via a
 human mic run and SP9 via a browser run, all on 2026-06-12; the only tabled
 checks are SP5/SP9's live-Stripe click-throughs and SP8's auto-cap firing, each
 unit-covered); SP10's smoke is ⬜ pending (needs Sentry DSNs — see
-`SP10-manual-smoke.md`); SP11's smoke is ⬜ pending (see `SP11-manual-smoke.md`);
+`SP10-manual-smoke.md`); SP11's smoke is 🟡 dev-stack-verified 2026-06-16
+(rate limit / body limit / PIN lockout via curl + the SIGTERM drain harness via
+`docker restart`; the live-drain recap-fallback, live WS `server-draining`, and
+Stripe-CLI webhook dedup/ordering are tabled but unit-covered — see
+`SP11-manual-smoke.md`);
 SP12's smoke is ✅ browser-verified 2026-06-16 via Playwright (authoring
 CRUD + child tap-to-start + validation/authz; the live-mic focus-note-in-Pip's-
 speech check is tabled, unit-covered). All are merged to `main`; the feature
@@ -139,7 +143,10 @@ enabled in prod (`NODE_ENV === 'production'`). Miscellaneous nits closed: relay
 prevents concurrent reconnect races; `subscriptions.stripe_customer_id` gets an
 index (migration 0007); Zod 400 responses no longer leak `.issues` (logged
 server-side via `reportError` instead). Migration 0007. Smoke
-`SP11-manual-smoke.md` ⬜ pending. Key files:
+`SP11-manual-smoke.md` 🟡 dev-stack-verified 2026-06-16 (rate limit / body
+limit / PIN lockout + SIGTERM drain harness; live-drain recap-fallback, live WS
+`server-draining`, and Stripe-CLI webhook dedup/ordering tabled but
+unit-covered). Key files:
 `apps/server/src/lib/ephemeralStore.ts`, `lib/rateLimit.ts`,
 `voice/relayRegistry.ts`, `routes/stripeWebhook.ts`, `lib/entitlement.ts`.
 
@@ -283,9 +290,15 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
 - `SP10-manual-smoke.md` (observability) — ⬜ **not yet run** (needs a free-tier
   Sentry account with two projects, their DSNs in `.env`, and
   `OPS_METRICS_TOKEN=<random>` — see the checklist in the doc).
-- `SP11-manual-smoke.md` (production hardening) — ⬜ **not yet run** (most checks
-  need only the dev stack; the webhook ordering check pairs with the still-tabled
-  SP5 live-Stripe smoke — see the checklist in the doc).
+- `SP11-manual-smoke.md` (production hardening) — 🟡 **dev-stack verified**
+  (2026-06-16): rate limit (11× → `429`+`Retry-After`, no junk rows), body limit
+  (~70KB → `413`), and PIN lockout (5 wrong → `429 pin_locked`, cleared on
+  restart) via headless curl; the SIGTERM **drain harness** fired live via
+  `docker restart` (`draining 0 live session(s)` → clean reboot). Tabled (each
+  unit-covered): the live recap-fallback drain of an *active* session and the
+  live WS `server-draining` frame (need a mic/Gemini session), and the Stripe-CLI
+  webhook dedup/ordering check (pairs with the SP5 live-Stripe smoke). Targeted
+  unit run: 40/40 across rateLimit/ephemeralStore/relayRegistry/relay/webhookApply/stripeWebhook.
 - `SP12-manual-smoke.md` (assignments authoring) — ✅ **browser-verified** via a
   Playwright run (2026-06-16): authoring add/edit/delete (one-tap confirm),
   empty-title gating, child home today-card + tap-to-start carrying
