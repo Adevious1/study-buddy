@@ -19,6 +19,8 @@ import { bodyLimit } from 'hono/body-limit';
 import { initSentry, installProcessHandlers } from './observability/sentry';
 import { reportError } from './observability/reportError';
 import { ephemeralStore } from './lib/ephemeralStore';
+import * as Sentry from '@sentry/bun';
+import { relayRegistry } from './voice/relayRegistry';
 
 export const app = new Hono();
 app.use('*', requestLogger);
@@ -34,6 +36,13 @@ app.use('/api/*', async (c, next) => {
   if (c.req.header('upgrade')?.toLowerCase() === 'websocket') return next();
   if (c.req.path.startsWith('/api/stripe/webhook')) return next();
   return jsonBodyLimit(c, next);
+});
+
+app.use('*', async (c, next) => {
+  if (relayRegistry.isDraining()) {
+    return c.json({ error: { code: 'draining', message: 'Server is restarting' } }, 503);
+  }
+  return next();
 });
 
 app.route('/', healthRoute);
@@ -64,10 +73,28 @@ app.onError((err, c) => {
 });
 
 const port = Number(process.env.PORT ?? 3001);
+const SHUTDOWN_DRAIN_MS = Number(process.env.SHUTDOWN_DRAIN_MS ?? 25_000);
+
 if (import.meta.main) {
   initSentry();
   installProcessHandlers();
   ephemeralStore.startSweep();
   console.log(`[server] listening on :${port}`);
-  Bun.serve({ port, fetch: app.fetch, websocket: voiceWebsocket });
+  const server = Bun.serve({ port, fetch: app.fetch, websocket: voiceWebsocket });
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return; // idempotent: a second signal during drain is ignored
+    shuttingDown = true;
+    console.log(`[server] ${signal} — draining ${relayRegistry.size()} live session(s)`);
+    relayRegistry.beginDraining();
+    try {
+      await relayRegistry.drainAll(SHUTDOWN_DRAIN_MS);
+    } catch { /* best-effort */ }
+    try { await Sentry.flush(2000); } catch { /* best-effort */ }
+    server.stop();
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
+  process.on('SIGINT', () => { void shutdown('SIGINT'); });
 }

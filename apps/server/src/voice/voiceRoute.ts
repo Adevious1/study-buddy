@@ -6,6 +6,7 @@ import { requireEntitled } from '../lib/requireEntitled';
 import { createRelay } from './relay';
 import { makeGeminiConnector } from './geminiSession';
 import { makeGeminiRecapGenerator } from '../recap/generateRecap';
+import { relayRegistry } from './relayRegistry';
 
 const apiKey = process.env.GEMINI_API_KEY ?? '';
 // Fail at boot, not as a cryptic mid-session Gemini auth error. Dev/test keep
@@ -27,10 +28,16 @@ export const voiceRoute = new Hono<{ Variables: ChildVariables }>().get(
 
     return {
       onOpen(_evt, ws) {
+        if (relayRegistry.isDraining()) {
+          try { ws.send(JSON.stringify({ type: 'error', code: 'server-draining', message: 'Server is restarting — please try again in a moment.' })); } catch { /* ignore */ }
+          try { ws.close(); } catch { /* ignore */ }
+          return;
+        }
         relay = createRelay({
           childId,
           connector,
           recapGenerator,
+          registry: relayRegistry,
           sink: {
             sendControl: (m) => ws.send(JSON.stringify(m)),
             sendBinary: (b) => ws.send(b as Uint8Array<ArrayBuffer>),
