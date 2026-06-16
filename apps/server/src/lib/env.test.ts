@@ -54,8 +54,13 @@ describe('assertBootEnv', () => {
       }
       fn();
     } finally {
-      // Restore: delete keys we may have added, then reassign the snapshot.
+      // Restore exactly: delete every key we may have touched — including
+      // override keys like NODE_ENV that were absent from the snapshot (so
+      // Object.assign alone could not remove them) — then reapply the snapshot.
       for (const v of REQUIRED_ENV) delete process.env[v.name];
+      for (const k of Object.keys(overrides)) {
+        if (!(k in snapshot)) delete process.env[k];
+      }
       Object.assign(process.env, snapshot);
     }
   }

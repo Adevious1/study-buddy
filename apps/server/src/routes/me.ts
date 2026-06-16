@@ -8,7 +8,7 @@ import { guardianContext, type GuardianVariables } from '../lib/guardianContext'
 import { isLocked, recordFail, clearFails } from '../lib/pinLockout';
 import { getEntitlement, syncSeatQuantity } from '../lib/billing';
 import { deleteAccount, StripeCancelError } from '../lib/accountLifecycle';
-import { auth } from '../lib/auth';
+import { auth, authSecret } from '../lib/auth';
 import type { MeResponse } from '@study-buddy/shared';
 import { reportError } from '../observability/reportError';
 import { rateLimit } from '../lib/rateLimit';
@@ -16,7 +16,8 @@ import { rateLimit } from '../lib/rateLimit';
 export const meRoute = new Hono<{ Variables: GuardianVariables }>();
 meRoute.use('*', guardianContext);
 
-const COOKIE_SECRET = process.env.BETTER_AUTH_SECRET || 'dev-only-change-me';
+// One source of truth with better-auth's signing secret (see lib/auth.ts).
+const COOKIE_SECRET = authSecret;
 const pinSchema = z.object({ pin: z.string().regex(/^\d{4}$/) });
 
 // Generous backstop ABOVE the 5-fail PIN lockout (the lockout is the primary

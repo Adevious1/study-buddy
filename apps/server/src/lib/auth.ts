@@ -18,13 +18,24 @@ const rawSecret = process.env.BETTER_AUTH_SECRET?.trim();
 if (isProd && !rawSecret) {
   throw new Error('BETTER_AUTH_SECRET is required in production');
 }
-const secret = rawSecret || 'dev-only-change-me';
+/** The resolved session-signing secret. Exported so other signers (e.g. the
+ *  dashboard-unlock cookie in routes/me.ts) derive it identically — one source
+ *  of truth, no drift. */
+export const authSecret = rawSecret || 'dev-only-change-me';
+
+// Same defense-in-depth as the secret: betterAuth() is built at import time with
+// this baseURL, so guard in prod so an unset BETTER_AUTH_URL can never fall back
+// to localhost and break OAuth redirects. `.trim()` treats docker's
+// `${BETTER_AUTH_URL:-}` (empty/whitespace) as missing.
+const rawBaseUrl = process.env.BETTER_AUTH_URL?.trim();
+if (isProd && !rawBaseUrl) {
+  throw new Error('BETTER_AUTH_URL is required in production');
+}
+const baseURL = rawBaseUrl || 'http://localhost:5173';
 
 export const auth = betterAuth({
-  // `||` not `??`: docker-compose passes BETTER_AUTH_URL as `${BETTER_AUTH_URL:-}`,
-  // an empty string when unset — `??` would keep '' and break OAuth redirects.
-  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:5173',
-  secret,
+  baseURL,
+  secret: authSecret,
   trustedOrigins: [
     'http://localhost:5173',
     'http://localhost:3001',
