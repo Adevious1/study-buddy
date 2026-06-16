@@ -20,8 +20,10 @@ human mic run and SP9 via a browser run, all on 2026-06-12; the only tabled
 checks are SP5/SP9's live-Stripe click-throughs and SP8's auto-cap firing, each
 unit-covered); SP10's smoke is ⬜ pending (needs Sentry DSNs — see
 `SP10-manual-smoke.md`); SP11's smoke is ⬜ pending (see `SP11-manual-smoke.md`);
-SP12's smoke is ⬜ pending (see `SP12-manual-smoke.md`). All are merged to
-`main`; the feature branches are deleted.
+SP12's smoke is ✅ browser-verified 2026-06-16 via Playwright (authoring
+CRUD + child tap-to-start + validation/authz; the live-mic focus-note-in-Pip's-
+speech check is tabled, unit-covered). All are merged to `main`; the feature
+branches are deleted.
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
 button to show Pip a photo of their work (drawing, worksheet/textbook, or
@@ -162,7 +164,8 @@ added to the `Repository` seam and `apiRepository`. Key files:
 (`{{focus}}` token), `apps/web/src/components/AssignmentForm.tsx`,
 `apps/web/src/routes/dashboard/DashboardRoute.tsx` (authoring section),
 `apps/web/src/routes/app/HomeRoute.tsx` (`AssignmentCard` onStart). Smoke:
-`SP12-manual-smoke.md` ⬜ pending.
+`SP12-manual-smoke.md` ✅ browser-verified 2026-06-16 (Playwright; live-mic
+focus-note-in-speech check tabled, unit-covered).
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -283,9 +286,12 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
 - `SP11-manual-smoke.md` (production hardening) — ⬜ **not yet run** (most checks
   need only the dev stack; the webhook ordering check pairs with the still-tabled
   SP5 live-Stripe smoke — see the checklist in the doc).
-- `SP12-manual-smoke.md` (assignments authoring) — ⬜ **not yet run** (requires
-  dev stack + a real mic run for the focus-note Pip behavior check; server CRUD
-  and authz are unit-covered).
+- `SP12-manual-smoke.md` (assignments authoring) — ✅ **browser-verified** via a
+  Playwright run (2026-06-16): authoring add/edit/delete (one-tap confirm),
+  empty-title gating, child home today-card + tap-to-start carrying
+  subject/topic/notes into `/app/voice`, and server validation/authz (400s + 404).
+  Only the live-mic check (Pip's spoken opening reflecting the focus note) is
+  tabled — unit-covered in `test/voice/systemPrompt.test.ts`.
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
