@@ -144,6 +144,17 @@ tap-to-start on the home screen, and Pip receiving the focus note.
 - **No `>120 min` client validation:** the form has `max={120}` on the number
   input (browsers enforce), but a crafted request is rejected by the server (400).
   Client-side enforcement deferred.
+- **"Today" is UTC, not the guardian's local day:** both the form's `min={today()}`
+  and the server's today/past-date guard use `new Date().toISOString().slice(0,10)`
+  (UTC), matching the pre-existing `assignments/today` filter convention. They are
+  mutually consistent (no spurious 400s), but a guardian in a timezone behind UTC
+  near midnight could see "today" differ from their local calendar day. Acceptable
+  for now; a per-guardian timezone is future work.
+- **Assignment authoring routes are not rate-limited.** SP11's targeted limiter
+  covers PIN-verify / add-child / billing only. Create/edit/delete are
+  guardian-authenticated, behind the 64 KB body cap, and Zod-capped (title 80 /
+  notes 500), so abuse surface is low (a guardian could only create unbounded
+  rows under their own children) — left unlimited deliberately.
 
 ## Automated coverage (run anytime)
 

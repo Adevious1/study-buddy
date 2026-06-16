@@ -20,7 +20,6 @@ import { startCheckout, openPortal } from '../billing/billingClient';
 import { TrialBanner } from '../../components/TrialBanner';
 import { AssignmentForm } from '../../components/AssignmentForm';
 
-/** Minimal overlay shell for add/edit forms. */
 /** A lightweight one-tap confirm for deleting an assignment. Unlike SP9's
  *  typed-word ConfirmDangerModal (for irreversible child/account deletion), an
  *  assignment is trivially re-creatable, so a plain Cancel/Delete is enough. */
@@ -48,6 +47,7 @@ function DeleteConfirm({ assignment, onConfirm, onClose }: {
   );
 }
 
+/** Minimal overlay shell for add/edit forms. */
 function FormModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 px-6">
