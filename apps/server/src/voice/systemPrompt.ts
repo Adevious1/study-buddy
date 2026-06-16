@@ -108,7 +108,12 @@ function intro(input: SystemPromptInput): string {
 /** The `{{focus}}` value: the guardian's per-assignment note, framed as where to
  *  begin — never as license to abandon the Socratic rule. Empty when no note. */
 function focus(input: SystemPromptInput): string {
-  const n = input.notes?.trim();
+  // Free guardian text interpolated into the system prompt. Strip braces so an
+  // injected `{{token}}` can't reach the model as a literal artifact, collapse
+  // whitespace/newlines to one line (so a `#`-prefixed line can't be heading-
+  // stripped and the focus stays a single sentence), and cap length defensively
+  // — the voice WS `start` message is not body-limited like the REST routes.
+  const n = input.notes?.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
   return n
     ? `The grown-up shared what to focus on this time: "${n}". Use it to choose where you begin — but you still guide ${input.childName} Socratically and never just give the answer.`
     : '';

@@ -135,11 +135,20 @@ describe('{{focus}} token', () => {
     const out = await buildSystemInstruction(base);
     expect(out).not.toContain('focus on');
   });
+  it('omits the focus line for a whitespace-only note', async () => {
+    const out = await buildSystemInstruction({ ...base, notes: '   \n\t ' });
+    expect(out).not.toContain('focus on');
+  });
+  it('strips braces so an injected {{token}} cannot reach the model', async () => {
+    const out = await buildSystemInstruction({ ...base, notes: 'work on {{childName}} fractions' });
+    expect(out).toContain('work on childName fractions');
+    expect(out).not.toContain('{{childName}} fractions');
+  });
 });
 
 describe('BUILTIN_TEMPLATE', () => {
-  it('contains all six tokens', () => {
-    for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{intro}}', '{{traitLean}}']) {
+  it('contains all the tokens', () => {
+    for (const t of ['{{childName}}', '{{grade}}', '{{subject}}', '{{topic}}', '{{intro}}', '{{traitLean}}', '{{focus}}']) {
       expect(BUILTIN_TEMPLATE).toContain(t);
     }
   });
