@@ -5,7 +5,7 @@ import { voiceReducer, initialVoiceState } from './voiceReducer';
 import { startCapture, type Capture } from './audioCapture';
 import { AudioPlayer } from './audioPlayback';
 
-export interface StartArgs { subjectKind: SubjectKind; topic: string; title: string; }
+export interface StartArgs { subjectKind: SubjectKind; topic: string; title: string; notes?: string; }
 
 const WS_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '/api';
 

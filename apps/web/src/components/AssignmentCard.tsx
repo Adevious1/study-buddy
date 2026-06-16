@@ -6,21 +6,27 @@ import { subjectLabel, subjectTheme } from '../theme/subjectTheme';
 interface AssignmentCardProps {
   assignment: Assignment;
   last?: boolean;
+  /** When provided, the card becomes interactive (tappable/keyboard-accessible) and calls onStart on activation. */
+  onStart?: () => void;
 }
 
-export function AssignmentCard({ assignment, last = false }: AssignmentCardProps) {
+export function AssignmentCard({ assignment, last = false, onStart }: AssignmentCardProps) {
   const { subjectKind, title, minutes, stars, totalStars } = assignment;
   const theme = subjectTheme(subjectKind);
 
+  // Card with onClick renders as a <button>, giving free keyboard accessibility
+  // (Enter + Space) and ARIA semantics. When onStart is undefined we render the
+  // non-interactive div variant.
   return (
     <Card
-      className="flex items-center gap-[14px] border-[1.5px] border-line"
+      className={`flex items-center gap-[14px] border-[1.5px] border-line${onStart ? ' hover:border-coral-l transition-colors' : ''}`}
       style={{
         borderRadius: 22,
         padding: 14,
         marginBottom: last ? 0 : 10,
         background: 'var(--color-surface)',
       }}
+      onClick={onStart}
     >
       <div
         className="flex shrink-0 items-center justify-center"

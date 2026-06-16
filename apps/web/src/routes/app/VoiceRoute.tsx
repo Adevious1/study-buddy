@@ -103,6 +103,7 @@ interface VoiceNavState {
   subjectKind?: SubjectKind;
   topic?: string;
   title?: string;
+  notes?: string;
   chooseSubject?: boolean;
 }
 
@@ -122,9 +123,9 @@ export function VoiceRoute() {
   const { state, start, end, mute, unmute, sendSnapshot, consumeCameraOffer } = useVoiceSession();
   const [muted, setMuted] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
-  const [picked, setPicked] = useState<{ subjectKind: SubjectKind; topic: string; title: string } | null>(
+  const [picked, setPicked] = useState<{ subjectKind: SubjectKind; topic: string; title: string; notes?: string } | null>(
     nav.subjectKind
-      ? { subjectKind: nav.subjectKind, topic: nav.topic ?? '', title: nav.title ?? subjectLabel(nav.subjectKind) }
+      ? { subjectKind: nav.subjectKind, topic: nav.topic ?? '', title: nav.title ?? subjectLabel(nav.subjectKind), notes: nav.notes }
       : null,
   );
 
