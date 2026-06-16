@@ -135,7 +135,8 @@ export const assignments = pgTable(
     scheduledDate: date('scheduled_date').notNull(),
     minutes: integer('minutes').notNull(),
     stars: integer('stars').notNull().default(0),
-    totalStars: integer('total_stars').notNull(),
+    totalStars: integer('total_stars').notNull().default(3),
+    notes: text('notes'),
     ...timestamps,
   },
   (t) => ({
