@@ -1,6 +1,7 @@
 import type {
   Student, Assignment, ContinueSession, Subject,
   LearningProfile, WeekActivity, RecapResult, SnapshotMeta,
+  NewAssignmentInput, AssignmentPatch,
 } from '@study-buddy/shared';
 
 export interface Repository {
@@ -16,4 +17,9 @@ export interface Repository {
   getRecap(): Promise<RecapResult | null>;
   /** Recent snapshots the child showed Pip; [] when none. */
   getRecentSnapshots(): Promise<SnapshotMeta[]>;
+  /** Upcoming assignments (today onward) for guardian management. */
+  getAssignments(): Promise<Assignment[]>;
+  createAssignment(input: NewAssignmentInput): Promise<Assignment>;
+  updateAssignment(id: string, patch: AssignmentPatch): Promise<Assignment>;
+  deleteAssignment(id: string): Promise<void>;
 }

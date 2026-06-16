@@ -69,7 +69,7 @@ export function createRelay(opts: RelayOptions) {
   // "Text " artifact is only stripped on the first delta of each turn.
   let pipTurnOpen = false;
 
-  async function buildPrompt(subjectKind: SubjectKind, topic: string): Promise<string> {
+  async function buildPrompt(subjectKind: SubjectKind, topic: string, notes?: string): Promise<string> {
     const [child] = await db.select().from(children).where(eq(children.id, childId)).limit(1);
     const [profile] = await db
       .select({ id: learningProfiles.id })
@@ -89,6 +89,7 @@ export function createRelay(opts: RelayOptions) {
       grade: childGrade,
       subjectKind, topic,
       firstSession: priorSessions === 0,
+      notes,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       traits: traits as any,
     });
@@ -171,12 +172,12 @@ export function createRelay(opts: RelayOptions) {
     }
   }
 
-  async function start(subjectKind: SubjectKind, topic: string, title: string) {
+  async function start(subjectKind: SubjectKind, topic: string, title: string, notes?: string) {
     if (state !== 'idle') return;
     state = 'connecting';
     meta = { subjectKind, topic };
     try {
-      systemInstruction = await buildPrompt(subjectKind, topic);
+      systemInstruction = await buildPrompt(subjectKind, topic, notes);
       session = await connectGemini();
       sessionRowId = await createLiveSession(childId, subjectKind, title);
       // If the child ended/left while we were still connecting, finish() has
@@ -292,7 +293,7 @@ export function createRelay(opts: RelayOptions) {
   return {
     async handleControl(msg: ClientControl) {
       switch (msg.type) {
-        case 'start': await start(msg.subjectKind, msg.topic, msg.title); break;
+        case 'start': await start(msg.subjectKind, msg.topic, msg.title, msg.notes); break;
         case 'mute':
           try { session?.audioStreamEnd(); }
           catch (e) { reportError('relay-send-control', e, { childId, sessionId: sessionRowId ?? undefined }); }

@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signOut } from '../../auth/authClient';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Assignment } from '@study-buddy/shared';
 import { Pip } from '../../components/Pip';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -16,6 +18,57 @@ import { useActiveChildId } from '../../state/ChildProfileContext';
 import { repositoryMe } from '../auth/me';
 import { startCheckout, openPortal } from '../billing/billingClient';
 import { TrialBanner } from '../../components/TrialBanner';
+import { AssignmentForm } from '../../components/AssignmentForm';
+
+/** A lightweight one-tap confirm for deleting an assignment. Unlike SP9's
+ *  typed-word ConfirmDangerModal (for irreversible child/account deletion), an
+ *  assignment is trivially re-creatable, so a plain Cancel/Delete is enough. */
+function DeleteConfirm({ assignment, onConfirm, onClose }: {
+  assignment: Assignment;
+  onConfirm: () => Promise<string | null>;
+  onClose: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <FormModal title={`Delete "${assignment.title}"?`} onClose={onClose}>
+      <div className="font-body text-[14px] text-ink-3">This removes the assignment. You can always add it again.</div>
+      {error && <div className="mt-2 font-body text-[13px] text-coral">{error}</div>}
+      <div className="mt-4 flex justify-end gap-2">
+        <Button kind="ghost" size="md" onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button kind="primary" size="md" disabled={busy} onClick={async () => {
+          setBusy(true); setError(null);
+          const msg = await onConfirm();
+          setBusy(false);
+          if (msg) setError(msg);
+        }}>Delete</Button>
+      </div>
+    </FormModal>
+  );
+}
+
+/** Minimal overlay shell for add/edit forms. */
+function FormModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 px-6">
+      <div role="dialog" aria-modal="true" aria-labelledby="form-modal-title" style={{ maxWidth: 440, width: '100%' }}>
+        <Card style={{ borderRadius: 22, padding: 24, width: '100%' }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
+            <div id="form-modal-title" className="font-display text-[20px] font-extrabold text-ink">{title}</div>
+            <button
+              className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-line bg-transparent cursor-pointer text-ink-3 hover:bg-bg-2"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+          {children}
+        </Card>
+      </div>
+    </div>
+  );
+}
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
@@ -23,6 +76,12 @@ export function DashboardRoute() {
   const navigate = useNavigate();
   const { pipColorValue } = usePipColor();
   const childId = useActiveChildId();
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Assignment | null>(null);
+  const [deleting, setDeleting] = useState<Assignment | null>(null);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['child', childId, 'assignments'] });
 
   const studentQ = useQuery({
     queryKey: ['child', childId, 'student'],
@@ -40,8 +99,8 @@ export function DashboardRoute() {
     enabled: !!childId,
   });
   const assignmentsQ = useQuery({
-    queryKey: ['child', childId, 'assignments'],
-    queryFn: () => repository.getTodayAssignments(),
+    queryKey: ['child', childId, 'assignments', 'manage'],
+    queryFn: () => repository.getAssignments(),
     enabled: !!childId,
   });
   const snapshotsQ = useQuery({
@@ -422,9 +481,10 @@ export function DashboardRoute() {
           </div>
         </div>
 
-        {/* Today's adventures */}
-        <div style={{ marginBottom: 12 }}>
-          <SectionTitle action="See all subjects →">Today's adventures</SectionTitle>
+        {/* Assignments */}
+        <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+          <SectionTitle>Assignments</SectionTitle>
+          <Button kind="soft" size="sm" onClick={() => setAdding(true)}>+ Add assignment</Button>
         </div>
 
         {assignments.length === 0 ? (
@@ -433,10 +493,10 @@ export function DashboardRoute() {
             style={{ borderRadius: 22, padding: 24 }}
           >
             <div className="font-display font-bold text-ink" style={{ fontSize: 16 }}>
-              Nothing scheduled today
+              No assignments yet
             </div>
             <div className="font-semibold text-[13px] text-ink-3" style={{ marginTop: 4 }}>
-              Pick any subject to start a session with Pip.
+              Add an assignment to schedule a session with Pip.
             </div>
           </Card>
         ) : (
@@ -481,6 +541,9 @@ export function DashboardRoute() {
                 <div>
                   <div className="font-bold text-[11px] text-ink-3 uppercase tracking-[0.5px]">
                     {subjectLabel(a.subjectKind)}
+                    {a.scheduledDate && (
+                      <span className="ml-1 normal-case text-ink-4">· {a.scheduledDate}</span>
+                    )}
                   </div>
                   <div
                     className="font-display font-bold text-ink"
@@ -488,14 +551,21 @@ export function DashboardRoute() {
                   >
                     {a.title}
                   </div>
+                  {a.notes && (
+                    <div className="font-semibold text-[12px] text-ink-3 mt-1 line-clamp-2">{a.notes}</div>
+                  )}
                 </div>
 
-                {/* CTA */}
-                <Button kind="soft" size="sm" full onClick={() => navigate('/app/voice', {
-                  state: { subjectKind: a.subjectKind, topic: a.title, title: a.title },
-                })}>
-                  Start →
-                </Button>
+                {/* Actions */}
+                <div className="flex gap-2 mt-auto">
+                  <Button kind="soft" size="sm" full onClick={() => navigate('/app/voice', {
+                    state: { subjectKind: a.subjectKind, topic: a.title, title: a.title, notes: a.notes ?? undefined },
+                  })}>
+                    Start →
+                  </Button>
+                  <Button kind="ghost" size="sm" onClick={() => setEditing(a)}>Edit</Button>
+                  <Button kind="ghost" size="sm" onClick={() => setDeleting(a)}>Delete</Button>
+                </div>
               </Card>
             );
           })}
@@ -542,6 +612,49 @@ export function DashboardRoute() {
 
       </main>
     </div>
+
+    {/* ── Assignment modals ─────────────────────────────────── */}
+    {adding && (
+      <FormModal title="New assignment" onClose={() => setAdding(false)}>
+        <AssignmentForm
+          submitLabel="Add"
+          onSubmit={async (v) => {
+            try { await repository.createAssignment(v); invalidate(); setAdding(false); return null; }
+            catch { return 'Could not save. Please try again.'; }
+          }}
+        />
+      </FormModal>
+    )}
+
+    {editing && (
+      <FormModal title="Edit assignment" onClose={() => setEditing(null)}>
+        <AssignmentForm
+          initial={{
+            subjectKind: editing.subjectKind,
+            title: editing.title,
+            scheduledDate: editing.scheduledDate,
+            minutes: editing.minutes,
+            notes: editing.notes ?? undefined,
+          }}
+          submitLabel="Save"
+          onSubmit={async (v) => {
+            try { await repository.updateAssignment(editing.id, v); invalidate(); setEditing(null); return null; }
+            catch { return 'Could not save. Please try again.'; }
+          }}
+        />
+      </FormModal>
+    )}
+
+    {deleting && (
+      <DeleteConfirm
+        assignment={deleting}
+        onConfirm={async () => {
+          try { await repository.deleteAssignment(deleting.id); invalidate(); setDeleting(null); return null; }
+          catch { return 'Could not delete. Please try again.'; }
+        }}
+        onClose={() => setDeleting(null)}
+      />
+    )}
     </>
   );
 }

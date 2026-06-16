@@ -49,6 +49,16 @@ async function getOrNull<T>(path: string): Promise<T | null> {
   return (await res.json()) as T;
 }
 
+async function mutate<T>(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown): Promise<T> {
+  const res = await fetch(`${base}${path}`, {
+    method, credentials: 'include',
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new ApiError(res.status, `${method} ${path} failed`);
+  return (res.status === 204 ? undefined : await res.json()) as T;
+}
+
 export const apiRepository: Repository = {
   getStudent:          (): Promise<Student>                => get(`/children/${getActiveChildId()}`),
   getContinueSession:  (): Promise<ContinueSession | null> => getOrNull(`/children/${getActiveChildId()}/sessions/continue`),
@@ -58,6 +68,10 @@ export const apiRepository: Repository = {
   getWeekActivity:     (): Promise<WeekActivity>           => get(`/children/${getActiveChildId()}/activity?range=week`),
   getRecap:            (): Promise<RecapResult | null>     => getOrNull(`/children/${getActiveChildId()}/sessions/latest/recap`),
   getRecentSnapshots:  (): Promise<SnapshotMeta[]>        => get(`/children/${getActiveChildId()}/snapshots`),
+  getAssignments:      (): Promise<Assignment[]>           => get(`/children/${getActiveChildId()}/assignments`),
+  createAssignment:    (input): Promise<Assignment>        => mutate(`/children/${getActiveChildId()}/assignments`, 'POST', input),
+  updateAssignment:    (id, patch): Promise<Assignment>    => mutate(`/children/${getActiveChildId()}/assignments/${id}`, 'PATCH', patch),
+  deleteAssignment:    (id): Promise<void>                 => mutate(`/children/${getActiveChildId()}/assignments/${id}`, 'DELETE'),
 };
 
 /** Same-origin URL for a stored snapshot image; cookies are sent automatically by <img>. */

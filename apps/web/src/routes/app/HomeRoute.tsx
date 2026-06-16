@@ -187,6 +187,9 @@ export function HomeRoute() {
               key={a.id}
               assignment={a}
               last={i === assignments.length - 1}
+              onStart={() => navigate('/app/voice', {
+                state: { subjectKind: a.subjectKind, topic: a.title, title: a.title, notes: a.notes ?? undefined },
+              })}
             />
           ))
         ) : (
