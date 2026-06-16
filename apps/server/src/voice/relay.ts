@@ -11,6 +11,7 @@ import { generateRecap, type RecapGenerator } from '../recap/generateRecap';
 import type { GeminiConnector, GeminiLiveSession, GeminiEvents } from './geminiSession';
 import { saveSnapshot } from './snapshots';
 import { reportError, reportSignal } from '../observability/reportError';
+import type { RelayRegistry, Drainable } from './relayRegistry';
 
 export interface RelaySink {
   sendControl: (m: ServerControl) => void;
@@ -25,6 +26,7 @@ export interface RelayOptions {
   nudgeLeadMs?: number; // default 2 min before the cap
   reconnectBackoffsMs?: number[]; // default [500, 1500]
   recapGenerator?: RecapGenerator | null;
+  registry?: RelayRegistry;
 }
 
 type State = 'idle' | 'connecting' | 'live' | 'resuming' | 'ended';
@@ -57,6 +59,11 @@ export function createRelay(opts: RelayOptions) {
   let nudgeTimer: ReturnType<typeof setTimeout> | null = null;
   let systemInstruction = '';
   let reconnectCount = 0;
+  let draining = false;
+  // Forward reference: assigned synchronously at the bottom of createRelay (before
+  // any session goes live) so finish() can reference it without a definite-assignment
+  // error. The no-op stub is replaced immediately.
+  let drainHandle: Drainable = { shutdown: async () => {} };
   // True while a Pip turn is mid-stream (deltas still arriving); the leading
   // "Text " artifact is only stripped on the first delta of each turn.
   let pipTurnOpen = false;
@@ -178,6 +185,7 @@ export function createRelay(opts: RelayOptions) {
       state = 'live';
       sink.sendControl({ type: 'ready' });
       sink.sendControl({ type: 'status', state: 'live' });
+      opts.registry?.register(drainHandle);
       const cap = opts.softCapMs ?? SOFT_CAP_MS;
       const lead = opts.nudgeLeadMs ?? NUDGE_LEAD_MS;
       capTimer = setTimeout(() => { void finish('completed'); }, cap);
@@ -212,6 +220,7 @@ export function createRelay(opts: RelayOptions) {
     try {
       if (sessionRowId) {
         if (finalState === 'completed') {
+          const generator = draining ? null : (opts.recapGenerator ?? null);
           const recapResult = await generateRecap(
             {
               turns,
@@ -220,7 +229,7 @@ export function createRelay(opts: RelayOptions) {
               subjectKind: meta?.subjectKind ?? 'math',
               topic: meta?.topic ?? '',
             },
-            opts.recapGenerator ?? null,
+            generator,
           );
           await finalizeLiveSession(sessionRowId, 'completed', {
             transcript: turns,
@@ -238,6 +247,7 @@ export function createRelay(opts: RelayOptions) {
       // the browser's wrapping-up screen waits for this to navigate to the recap.
       sink.sendControl({ type: 'status', state: 'ended' });
     }
+    opts.registry?.unregister(drainHandle);
   }
 
   async function handleSnapshot(mime: string, data: string) {
@@ -266,6 +276,12 @@ export function createRelay(opts: RelayOptions) {
     sink.sendControl({ type: 'snapshot-ack', ok: true });
   }
 
+  async function shutdown(): Promise<void> {
+    draining = true;
+    await finish('completed');
+  }
+  drainHandle = { shutdown };
+
   return {
     async handleControl(msg: ClientControl) {
       switch (msg.type) {
@@ -280,5 +296,6 @@ export function createRelay(opts: RelayOptions) {
       if (state === 'live') session?.sendAudio(pcm16k);
     },
     async handleDisconnect() { await finish('abandoned'); },
+    shutdown,
   };
 }
