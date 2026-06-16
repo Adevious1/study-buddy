@@ -85,7 +85,11 @@ describe('assertBootEnv', () => {
   });
 
   it('does not throw in dev when only prod vars are unset', () => {
-    withEnv({ NODE_ENV: 'development', DATABASE_URL: 'postgres://x' }, () => {
+    // Populate every 'always' var dynamically so this stays correct if more are added.
+    const alwaysVars = Object.fromEntries(
+      REQUIRED_ENV.filter((v) => v.level === 'always').map((v) => [v.name, 'postgres://x']),
+    );
+    withEnv({ NODE_ENV: 'development', ...alwaysVars }, () => {
       expect(() => assertBootEnv()).not.toThrow();
     });
   });

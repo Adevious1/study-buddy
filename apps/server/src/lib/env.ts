@@ -45,8 +45,8 @@ export function assertBootEnv(): void {
   const missing = validateEnv(process.env, isProd);
   if (missing.length === 0) return;
   const lines = missing.map((name) => {
-    const v = REQUIRED_ENV.find((e) => e.name === name)!;
-    return `  - ${name} — ${v.description}`;
+    const v = REQUIRED_ENV.find((e) => e.name === name);
+    return `  - ${name} — ${v?.description ?? ''}`;
   });
   throw new Error(
     `[env] Missing required environment variable(s) (NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}):\n` +
