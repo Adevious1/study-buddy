@@ -28,7 +28,21 @@ export interface Assignment {
   minutes: number;
   stars: number;
   totalStars: number;
+  notes?: string | null;
+  scheduledDate?: string; // YYYY-MM-DD; present on the management list
 }
+
+/** Guardian-authored assignment creation payload (client ⇄ server contract). */
+export interface NewAssignmentInput {
+  subjectKind: SubjectKind;
+  title: string;
+  scheduledDate: string; // YYYY-MM-DD
+  minutes: number;
+  notes?: string;
+}
+
+/** All fields optional — an edit patch. */
+export type AssignmentPatch = Partial<NewAssignmentInput>;
 
 export interface ContinueSession {
   id: string;

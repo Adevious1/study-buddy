@@ -8,7 +8,7 @@ export type VoiceErrorCode = 'mic-denied' | 'gemini-unavailable' | 'connection-l
 
 /** Browser → relay control messages. Audio is sent separately as binary frames. */
 export type ClientControl =
-  | { type: 'start'; subjectKind: SubjectKind; topic: string; title: string }
+  | { type: 'start'; subjectKind: SubjectKind; topic: string; title: string; notes?: string }
   | { type: 'mute' }
   | { type: 'unmute' }
   | { type: 'snapshot'; mime: 'image/jpeg'; data: string /* base64, no data-URL prefix */ }
