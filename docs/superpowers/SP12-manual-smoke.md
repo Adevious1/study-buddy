@@ -14,10 +14,14 @@ tap-to-start on the home screen, and Pip receiving the focus note.
 > assignment's `subjectKind`/`topic`/`title`/`notes`** in the router state (no
 > subject picker shown); and server validation + authz via in-page fetch
 > (past-date / `minutes:200` / empty-title / bad-subject → **400**, unowned child
-> → **404**, owned child → **200**). **Tabled (needs a human mic run):** whether
-> Pip's *spoken* opening reflects the focus note while staying Socratic — the
-> client wiring is confirmed up to the WS `start` message; the `{{focus}}`
-> prompt-token behavior itself is unit-covered in `test/voice/systemPrompt.test.ts`.
+> → **404**, owned child → **200**). **Tabled — consciously deferred (last
+> reaffirmed 2026-06-16), needs a human mic run:** whether Pip's *spoken* opening
+> reflects the focus note while staying Socratic. This is the only remaining SP12
+> check; the risk is low because the client wiring is confirmed up to the WS
+> `start` message and the `{{focus}}` prompt-token behavior itself is unit-covered
+> in `test/voice/systemPrompt.test.ts` (drift-guard style). It rides along with the
+> next human mic session (e.g. the P1 prod-deploy bundle) rather than warranting a
+> dedicated run.
 >
 > Original setup note: run after merging SP12 and applying migration 0008:
 > ```
@@ -143,10 +147,12 @@ tap-to-start on the home screen, and Pip receiving the focus note.
 - **Web UI has no automated tests** for the assignment authoring modals —
   verified only by typecheck + build (CI) and this manual smoke. The server-side
   route is covered by `bun test`.
-- **Live mic focus-note check requires a human mic run.** CI only covers build
-  + typecheck; the focus-note injection into Pip's system prompt is unit-covered
-  in `test/voice/systemPrompt.test.ts` (drift-guard style), but whether Pip
-  *behaves* on the focus note requires a real session.
+- **Live mic focus-note check requires a human mic run — consciously deferred**
+  (last reaffirmed 2026-06-16). CI only covers build + typecheck; the focus-note
+  injection into Pip's system prompt is unit-covered in
+  `test/voice/systemPrompt.test.ts` (drift-guard style), but whether Pip
+  *behaves* on the focus note requires a real session. Deferred to ride along with
+  the next human mic session rather than a standalone run.
 - **No client-side past-date guard:** the form sets `min={today()}` on the date
   input, which browsers enforce visually but not server-side (a manual past-date
   entry is caught by the API 400). The server is the authoritative gate.

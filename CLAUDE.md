@@ -28,7 +28,8 @@ Stripe-CLI webhook dedup/ordering are tabled but unit-covered — see
 `SP11-manual-smoke.md`);
 SP12's smoke is ✅ browser-verified 2026-06-16 via Playwright (authoring
 CRUD + child tap-to-start + validation/authz; the live-mic focus-note-in-Pip's-
-speech check is tabled, unit-covered). All are merged to `main`; the feature
+speech check is consciously deferred — tabled, unit-covered, rides the next mic
+session). All are merged to `main`; the feature
 branches are deleted.
 
 SP7 (camera vision / "Show Pip"): during a live voice session a child taps a camera
@@ -176,7 +177,8 @@ added to the `Repository` seam and `apiRepository`. Key files:
 `apps/web/src/routes/dashboard/DashboardRoute.tsx` (authoring section),
 `apps/web/src/routes/app/HomeRoute.tsx` (`AssignmentCard` onStart). Smoke:
 `SP12-manual-smoke.md` ✅ browser-verified 2026-06-16 (Playwright; live-mic
-focus-note-in-speech check tabled, unit-covered).
+focus-note-in-speech check consciously deferred — tabled, unit-covered, rides
+the next mic session).
 
 SP3 (live voice tutor): browser ⇄ Hono WS relay ⇄ Gemini Live
 (`gemini-3.1-flash-live-preview`), open-mic native-audio Socratic tutoring with
@@ -315,7 +317,8 @@ doc under `docs/superpowers/`; status as of 2026-06-10:
   empty-title gating, child home today-card + tap-to-start carrying
   subject/topic/notes into `/app/voice`, and server validation/authz (400s + 404).
   Only the live-mic check (Pip's spoken opening reflecting the focus note) is
-  tabled — unit-covered in `test/voice/systemPrompt.test.ts`.
+  consciously deferred (last reaffirmed 2026-06-16) — tabled, unit-covered in
+  `test/voice/systemPrompt.test.ts`, and set to ride the next human mic session.
 
 Dev seed login: `parent@studybuddy.dev` / `studybuddy`, dashboard PIN `1234`.
 
