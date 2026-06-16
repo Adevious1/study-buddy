@@ -19,9 +19,35 @@ import { repositoryMe } from '../auth/me';
 import { startCheckout, openPortal } from '../billing/billingClient';
 import { TrialBanner } from '../../components/TrialBanner';
 import { AssignmentForm } from '../../components/AssignmentForm';
-import { ConfirmDangerModal } from '../../components/ConfirmDangerModal';
 
 /** Minimal overlay shell for add/edit forms. */
+/** A lightweight one-tap confirm for deleting an assignment. Unlike SP9's
+ *  typed-word ConfirmDangerModal (for irreversible child/account deletion), an
+ *  assignment is trivially re-creatable, so a plain Cancel/Delete is enough. */
+function DeleteConfirm({ assignment, onConfirm, onClose }: {
+  assignment: Assignment;
+  onConfirm: () => Promise<string | null>;
+  onClose: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <FormModal title={`Delete "${assignment.title}"?`} onClose={onClose}>
+      <div className="font-body text-[14px] text-ink-3">This removes the assignment. You can always add it again.</div>
+      {error && <div className="mt-2 font-body text-[13px] text-coral">{error}</div>}
+      <div className="mt-4 flex justify-end gap-2">
+        <Button kind="ghost" size="md" onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button kind="primary" size="md" disabled={busy} onClick={async () => {
+          setBusy(true); setError(null);
+          const msg = await onConfirm();
+          setBusy(false);
+          if (msg) setError(msg);
+        }}>Delete</Button>
+      </div>
+    </FormModal>
+  );
+}
+
 function FormModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 px-6">
@@ -620,11 +646,8 @@ export function DashboardRoute() {
     )}
 
     {deleting && (
-      <ConfirmDangerModal
-        title={`Delete "${deleting.title}"?`}
-        body="This permanently removes the assignment. This cannot be undone."
-        confirmWord={deleting.title}
-        actionLabel="Delete"
+      <DeleteConfirm
+        assignment={deleting}
         onConfirm={async () => {
           try { await repository.deleteAssignment(deleting.id); invalidate(); setDeleting(null); return null; }
           catch { return 'Could not delete. Please try again.'; }
