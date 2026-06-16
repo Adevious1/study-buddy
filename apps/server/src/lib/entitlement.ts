@@ -6,6 +6,7 @@ export interface SubRow {
   status: string | null;
   currentPeriodEnd: Date | null;
   seats: number;
+  lastStripeEventAt: Date | null;
 }
 
 export interface Entitlement {
@@ -39,11 +40,24 @@ export function entitlementOf(sub: SubRow, now: Date): Entitlement {
 /** A minimal shape of a Stripe webhook event (we only read what we use). */
 export interface StripeEventLike {
   type: string;
+  created: number; // unix seconds
   data: { object: Record<string, unknown> };
 }
 
-/** Pure reducer: given the current row + an event, return the next row state. Idempotent. */
-export function applyStripeEvent(sub: SubRow, event: StripeEventLike): SubRow {
+/** Pure reducer: current row + event → next row. Idempotent + ordering-safe.
+ *  Returns the SAME reference (no change) when the event is unhandled or stale. */
+export function applyStripeEvent(sub: SubRow, event: StripeEventLike, eventCreatedMs: number): SubRow {
+  // Strict `<`: a genuinely older event is stale. Equal timestamps are NOT stale —
+  // two distinct events can share a one-second `created`; arrival order wins there.
+  if (sub.lastStripeEventAt && eventCreatedMs < sub.lastStripeEventAt.getTime()) {
+    return sub;
+  }
+  const next = reduce(sub, event);
+  if (next === sub) return sub; // unhandled type — no state change, no stamp
+  return { ...next, lastStripeEventAt: new Date(eventCreatedMs) };
+}
+
+function reduce(sub: SubRow, event: StripeEventLike): SubRow {
   const obj = event.data.object as Record<string, unknown>;
   switch (event.type) {
     case 'checkout.session.completed':
